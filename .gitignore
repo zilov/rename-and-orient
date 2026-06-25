@@ -1,0 +1,22 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Genomic data files (never commit)
+*.pretext
+*.agp
+*.cram
+*.bam
+*.jira_cache.yaml
+user_config.yaml
+
+# OS
+.DS_Store
+.pytest_cache/
