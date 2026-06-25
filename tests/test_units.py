@@ -26,6 +26,7 @@ from rename_and_orient import (
     ChromosomeMapping,
     FinalChromosomeAssignment,
 )
+from rename_and_orient.names import extract_autosome_number
 
 
 @pytest.fixture
@@ -246,6 +247,13 @@ class TestChromosomeSuffixFunctions:
         ("1_HAP1", True),
         ("10_HAP2", True),
         ("W_HAP1", False),
+        # Subgenome-annotated suffixes (wheat A/B, hexaploid A/B/D)
+        ("1A", True),
+        ("1B", True),
+        ("7A", True),
+        ("7B", True),
+        ("1D", True),
+        ("1A_HAP1", True),
     ])
     def test_is_autosome_suffix(self, suffix, expected):
         """Test is_autosome_suffix."""
@@ -374,6 +382,81 @@ class TestResolveChromosomeAssignments:
         assert w.new_name == "SUPER_W_HAP2"
         assert w.new_suffix == "W"   # bare for sorting/unloc
         assert w.is_sex_chromosome
+
+
+class TestAlphanumericChromosomeSuffixes:
+    """Tests for polyploid genomes with subgenome-annotated chromosome names (e.g. wheat 1A/1B)."""
+
+    @pytest.mark.parametrize("suffix,expected", [
+        ("1A", 1),
+        ("7B", 7),
+        ("14D", 14),
+        ("1", 1),
+        ("10", 10),
+    ])
+    def test_extract_autosome_number(self, suffix, expected):
+        assert extract_autosome_number(suffix) == expected
+
+    def test_resolve_wheat_style_reference(self):
+        """Query chromosomes correctly renamed when reference uses 1A/1B subgenome notation."""
+        fasta = {
+            "SUPER_1": "ATCGATCG",
+            "SUPER_2": "GCTAGCTA",
+            "SUPER_3": "TTTTAAAA",
+            "SUPER_4": "CCCCGGGG",
+        }
+        # Reference: chr1A, chr1B, chr2A, chr2B (tetraploid wheat style)
+        mappings = [
+            ChromosomeMapping("SUPER_1", 8, "chr1A", 8, 1.0, 8, 0, False, "chr"),
+            ChromosomeMapping("SUPER_2", 8, "chr1B", 8, 1.0, 0, 8, True,  "chr"),
+            ChromosomeMapping("SUPER_3", 8, "chr2A", 8, 1.0, 8, 0, False, "chr"),
+            ChromosomeMapping("SUPER_4", 8, "chr2B", 8, 1.0, 0, 8, True,  "chr"),
+        ]
+
+        assignments, rc_lookup = resolve_chromosome_assignments(
+            mappings, fasta, "SUPER_", "SUPER_"
+        )
+
+        by_orig = {a.original_name: a for a in assignments}
+        assert by_orig["SUPER_1"].new_name == "SUPER_1A"
+        assert by_orig["SUPER_2"].new_name == "SUPER_1B"
+        assert by_orig["SUPER_3"].new_name == "SUPER_2A"
+        assert by_orig["SUPER_4"].new_name == "SUPER_2B"
+
+        assert not by_orig["SUPER_1"].needs_reverse_complement
+        assert by_orig["SUPER_2"].needs_reverse_complement
+
+    def test_sort_wheat_style_assignments(self):
+        """Assignments sort by numeric part first, then subgenome letter."""
+        assignments = [
+            FinalChromosomeAssignment("SUPER_3", "SUPER_2A", "2A", False, False),
+            FinalChromosomeAssignment("SUPER_1", "SUPER_1A", "1A", False, False),
+            FinalChromosomeAssignment("SUPER_4", "SUPER_2B", "2B", False, False),
+            FinalChromosomeAssignment("SUPER_2", "SUPER_1B", "1B", False, False),
+        ]
+        sorted_a = sort_assignments_for_output(assignments)
+        assert [a.new_name for a in sorted_a] == ["SUPER_1A", "SUPER_1B", "SUPER_2A", "SUPER_2B"]
+
+    def test_wheat_conflict_deferred_to_integer(self):
+        """When two query chromosomes map to the same reference chr, loser gets next integer."""
+        fasta = {
+            "SUPER_1": "ATCGATCG",
+            "SUPER_2": "GCTAGCTA",
+        }
+        # Both SUPER_1 (longer) and SUPER_2 (shorter) map to chr1A — SUPER_2 should be deferred
+        mappings = [
+            ChromosomeMapping("SUPER_1", 8, "chr1A", 8, 1.0, 8, 0, False, "chr"),
+            ChromosomeMapping("SUPER_2", 4, "chr1A", 4, 0.5, 0, 4, True,  "chr"),
+        ]
+
+        assignments, _ = resolve_chromosome_assignments(
+            mappings, fasta, "SUPER_", "SUPER_"
+        )
+
+        by_orig = {a.original_name: a for a in assignments}
+        assert by_orig["SUPER_1"].new_name == "SUPER_1A"
+        # Loser gets reassigned to next available integer (2)
+        assert by_orig["SUPER_2"].new_name == "SUPER_2"
 
 
 class TestDetectReferencePrefix:

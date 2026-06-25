@@ -4,6 +4,8 @@ from typing import Tuple
 
 SEX_CHROMOSOME_SUFFIXES = {'W', 'X', 'Y', 'Z', 'B'}
 _HAP_SUFFIX_RE = re.compile(r'_HAP\d+$', re.IGNORECASE)
+# Matches autosomes: numeric, optionally followed by one subgenome letter (e.g. '1', '7B', '2A')
+_AUTOSOME_SUFFIX_RE = re.compile(r'^\d+[A-Za-z]?$')
 
 
 def strip_hap_suffix(name: str) -> str:
@@ -34,8 +36,14 @@ def is_sex_chromosome_suffix(suffix: str) -> bool:
 
 
 def is_autosome_suffix(suffix: str) -> bool:
-    """Check if suffix represents an autosome (purely numeric)."""
-    return strip_hap_suffix(suffix).isdigit()
+    """Check if suffix represents an autosome (numeric, optionally with a subgenome letter like '1A')."""
+    return bool(_AUTOSOME_SUFFIX_RE.match(strip_hap_suffix(suffix)))
+
+
+def extract_autosome_number(suffix: str) -> int:
+    """Extract the numeric part from an autosome suffix (e.g. '1A' -> 1, '7' -> 7)."""
+    m = re.match(r'^(\d+)', strip_hap_suffix(suffix))
+    return int(m.group(1)) if m else 0
 
 
 def extract_chromosome_suffix(name: str, prefix: str = "SUPER_") -> str:

@@ -5,6 +5,7 @@ from typing import Dict, List, Tuple
 from .models import ChromosomeMapping, FinalChromosomeAssignment, UnlocMapping
 from .names import (
     _HAP_SUFFIX_RE,
+    extract_autosome_number,
     extract_chromosome_suffix,
     is_autosome_suffix,
     is_sex_chromosome_suffix,
@@ -68,8 +69,8 @@ def resolve_chromosome_assignments(
     for name in unmapped_names:
         suffix = extract_chromosome_suffix(name, query_chromosome_prefix)
         if is_autosome_suffix(suffix):
-            reserved_numbers.add(int(strip_hap_suffix(suffix)))
-            print(f"  Reserved: number {strip_hap_suffix(suffix)} (unmapped {name} keeps original name)")
+            reserved_numbers.add(extract_autosome_number(suffix))
+            print(f"  Reserved: number {extract_autosome_number(suffix)} (unmapped {name} keeps original name)")
 
     skipped_numbers = set()
 
@@ -78,9 +79,9 @@ def resolve_chromosome_assignments(
         target_suffix = m.target_suffix
 
         if is_autosome_suffix(target_suffix):
-            skipped_numbers.add(int(target_suffix))
+            skipped_numbers.add(extract_autosome_number(target_suffix))
             print(f"  Note: {m.query_name} (sex chr) -> {m.target_name} (autosome): "
-                  f"number {target_suffix} will be skipped")
+                  f"number {extract_autosome_number(target_suffix)} will be skipped")
 
         assignment = FinalChromosomeAssignment(
             original_name=m.query_name,
@@ -103,14 +104,15 @@ def resolve_chromosome_assignments(
             print(f"  Note: {m.query_name} (autosome) -> {m.target_name} (sex chr): "
                   f"will be reassigned")
         elif is_autosome_suffix(target_suffix):
-            target_num = int(target_suffix)
-            target_to_autosomes[target_num].append((m, m.total_alignment_length))
+            # Key by full suffix string (e.g. '1A', '1B', '7') to handle subgenome letters
+            target_to_autosomes[target_suffix].append((m, m.total_alignment_length))
 
     assigned_numbers = set()
     autosome_assignments = []
     deferred_autosomes = []
 
-    for target_num, candidates in target_to_autosomes.items():
+    for target_suffix_key, candidates in target_to_autosomes.items():
+        target_num = extract_autosome_number(target_suffix_key)
         if target_num in reserved_numbers:
             deferred_autosomes.extend([m for m, _ in candidates])
             print(f"  Number {target_num} reserved - deferring: {[m.query_name for m, _ in candidates]}")
@@ -123,12 +125,12 @@ def resolve_chromosome_assignments(
         candidates.sort(key=lambda x: x[1], reverse=True)
 
         winner, _ = candidates[0]
-        autosome_assignments.append((winner, target_num))
+        autosome_assignments.append((winner, target_suffix_key))
         assigned_numbers.add(target_num)
 
         for m, _ in candidates[1:]:
             deferred_autosomes.append(m)
-            print(f"  Conflict: {m.query_name} lost to {winner.query_name} for number {target_num}")
+            print(f"  Conflict: {m.query_name} lost to {winner.query_name} for {target_suffix_key}")
 
     all_used_numbers = assigned_numbers | reserved_numbers
     max_autosome = max(all_used_numbers) if all_used_numbers else 0
@@ -154,13 +156,14 @@ def resolve_chromosome_assignments(
         print(f"  Reassigned (was sex target): {m.query_name} -> {output_prefix}{next_available}")
         next_available += 1
 
-    for m, num in autosome_assignments:
+    for m, suffix_or_num in autosome_assignments:
         hap_match = _HAP_SUFFIX_RE.search(m.query_name)
         hap_str = hap_match.group(0) if hap_match else ""
+        new_suffix = str(suffix_or_num)
         assignment = FinalChromosomeAssignment(
             original_name=m.query_name,
-            new_name=f"{output_prefix}{num}{hap_str}",
-            new_suffix=str(num),
+            new_name=f"{output_prefix}{new_suffix}{hap_str}",
+            new_suffix=new_suffix,
             needs_reverse_complement=m.needs_reverse_complement,
             is_sex_chromosome=False
         )
@@ -184,11 +187,25 @@ def resolve_chromosome_assignments(
     return assignments, rc_lookup
 
 
+def _autosome_sort_key(suffix: str) -> tuple:
+    """Sort key for autosome suffixes: (numeric_part, subgenome_letter).
+    Handles both plain numbers ('7') and subgenome-annotated ('7B', '1A').
+    """
+    import re as _re
+    m = _re.match(r'^(\d+)([A-Za-z]*)$', suffix)
+    if m:
+        return (int(m.group(1)), m.group(2))
+    try:
+        return (int(suffix), '')
+    except ValueError:
+        return (0, suffix)
+
+
 def sort_assignments_for_output(
     assignments: List[FinalChromosomeAssignment]
 ) -> List[FinalChromosomeAssignment]:
     """
-    Sort assignments for output: autosomes by number, then sex chromosomes alphabetically.
+    Sort assignments for output: autosomes by number (then subgenome letter), then sex chromosomes alphabetically.
 
     Args:
         assignments: List of FinalChromosomeAssignment
@@ -199,7 +216,7 @@ def sort_assignments_for_output(
     autosomes = [a for a in assignments if not a.is_sex_chromosome]
     sex_chrs = [a for a in assignments if a.is_sex_chromosome]
 
-    autosomes.sort(key=lambda x: int(x.new_suffix))
+    autosomes.sort(key=lambda x: _autosome_sort_key(x.new_suffix))
     sex_chrs.sort(key=lambda x: x.new_suffix)
 
     return autosomes + sex_chrs
