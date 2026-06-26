@@ -4,7 +4,26 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 from .models import FinalChromosomeAssignment, UnlocMapping
-from .names import extract_chromosome_suffix, is_sex_chromosome_suffix, is_unloc_contig, parse_unloc_name
+from .names import (
+    _HAP_SUFFIX_RE,
+    extract_chromosome_suffix,
+    is_sex_chromosome_suffix,
+    is_unloc_contig,
+    parse_unloc_name,
+    strip_hap_suffix,
+)
+
+
+def _suffix_from_renamed(renamed_to: str) -> str:
+    """Extract the chromosomal suffix from a renamed_to value.
+
+    Strips any _HAPJ suffix first, then strips the leading alphabetic/underscore
+    prefix, returning just the chromosomal identifier (e.g. '3B', '1A', 'W', '7').
+    Works regardless of which output prefix (SUPER_, chr_, chr, ...) was used.
+    """
+    base = strip_hap_suffix(renamed_to)
+    m = re.match(r'^[A-Za-z_.]+(.+)$', base)
+    return m.group(1) if m else base
 
 
 def load_mapping_table_assignments(
@@ -18,6 +37,11 @@ def load_mapping_table_assignments(
     (produced by a previous run on haplotype 1). Columns used: query,
     renamed_to, needs_reverse_complement. Unlocs present only in this
     haplotype are mapped via their parent chromosome; they are never RC'd.
+
+    HAP suffix mismatch is handled transparently: if the table was built
+    from _HAP1 sequences but the current FASTA contains _HAP2 sequences,
+    the lookup is done on the base name (HAP suffix stripped) and the
+    correct HAP suffix is re-applied to the output name.
     """
     table_map: Dict[str, Dict] = {}
     with open(mapping_table_path) as fh:
@@ -39,15 +63,23 @@ def load_mapping_table_assignments(
         raise ValueError(f"Mapping table {mapping_table_path} is empty.")
     print(f"  Loaded {len(table_map)} entries from mapping table")
 
-    def _suffix_from_renamed(renamed_to: str) -> str:
-        """Extract the bare chromosomal suffix (e.g. '1', 'X') from renamed_to
-        regardless of which prefix was used in the original run."""
-        m = re.search(r'([A-Z]\d*|\d+)$', renamed_to, re.IGNORECASE)
-        return m.group(1) if m else renamed_to
+    # Build a HAP-agnostic lookup: strip _HAPJ from table keys so we can
+    # match SUPER_1_HAP2 against a table that was built from SUPER_1_HAP1.
+    base_table_map: Dict[str, Dict] = {}
+    for q, info in table_map.items():
+        if is_unloc_contig(q):
+            continue
+        base_q = strip_hap_suffix(q)
+        base_table_map[base_q] = {
+            "base_renamed_to": strip_hap_suffix(info["renamed_to"]),
+            "needs_rc": info["needs_rc"],
+        }
 
+    # Same for unloc parent resolution
     parent_new_suffix = {
-        q: _suffix_from_renamed(info["renamed_to"])
-        for q, info in table_map.items() if not is_unloc_contig(q)
+        strip_hap_suffix(q): _suffix_from_renamed(info["renamed_to"])
+        for q, info in table_map.items()
+        if not is_unloc_contig(q)
     }
 
     assignments: List[FinalChromosomeAssignment] = []
@@ -55,15 +87,22 @@ def load_mapping_table_assignments(
         n for n in sequences
         if n.startswith(query_chromosome_prefix) and not is_unloc_contig(n)
     ):
-        if orig not in table_map:
-            suffix = extract_chromosome_suffix(orig, query_chromosome_prefix)
-            print(f"  Warning: {orig} not in mapping table -- keeping original suffix")
+        hap_match = _HAP_SUFFIX_RE.search(orig)
+        hap_str = hap_match.group(0) if hap_match else ""
+        base_orig = strip_hap_suffix(orig)
+
+        if base_orig in base_table_map:
+            entry = base_table_map[base_orig]
+            suffix = _suffix_from_renamed(entry["base_renamed_to"])
+            needs_rc = entry["needs_rc"]
         else:
-            suffix = _suffix_from_renamed(table_map[orig]["renamed_to"])
-        needs_rc = table_map[orig]["needs_rc"] if orig in table_map else False
+            suffix = strip_hap_suffix(extract_chromosome_suffix(orig, query_chromosome_prefix))
+            needs_rc = False
+            print(f"  Warning: {orig} not in mapping table -- keeping original suffix")
+
         assignments.append(FinalChromosomeAssignment(
             original_name=orig,
-            new_name=f"{output_prefix}{suffix}",
+            new_name=f"{output_prefix}{suffix}{hap_str}",
             new_suffix=suffix,
             needs_reverse_complement=needs_rc,
             is_sex_chromosome=is_sex_chromosome_suffix(suffix),
@@ -75,7 +114,8 @@ def load_mapping_table_assignments(
         if n.startswith(query_chromosome_prefix) and is_unloc_contig(n)
     ):
         parent, unloc_num = parse_unloc_name(contig)
-        if parent not in parent_new_suffix:
+        base_parent = strip_hap_suffix(parent)
+        if base_parent not in parent_new_suffix:
             print(f"  Warning: parent '{parent}' for '{contig}' not in mapping table -- skipping")
             continue
         unloc_mappings.append(UnlocMapping(

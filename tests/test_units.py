@@ -944,3 +944,43 @@ class TestLoadMappingTable:
             table, sequences, query_chromosome_prefix="SUPER_", output_prefix="chr_"
         )
         assert assignments[0].new_name == "chr_1"
+
+    def test_hap_suffix_mismatch_wheat(self, tmp_path):
+        """Table from _HAP1 correctly applied to _HAP2 sequences with subgenome suffixes."""
+        # Table produced from HAP1 run (wheat tetraploid: A and B subgenomes)
+        table = self._write_table(tmp_path, [
+            "SUPER_14_HAP1\tchr1A\tSUPER_1A_HAP1\t608667130\t554212781\t0.91\t495391235\t230960508\tno\n",
+            "SUPER_9_HAP1\tchr1B\tSUPER_1B_HAP1\t737738003\t644870957\t0.87\t605613648\t249224471\tno\n",
+            "SUPER_5_HAP1\tchr7A\tSUPER_7A_HAP1\t761505316\t696320845\t0.91\t384953915\t647984458\tyes\n",
+        ])
+        # HAP2 has the same base chromosomes but with _HAP2 suffix
+        sequences = {
+            "SUPER_14_HAP2": "A" * 100,
+            "SUPER_9_HAP2":  "T" * 100,
+            "SUPER_5_HAP2":  "C" * 100,
+        }
+        assignments, _ = load_mapping_table_assignments(
+            table, sequences, query_chromosome_prefix="SUPER_", output_prefix="SUPER_"
+        )
+        by_orig = {a.original_name: a for a in assignments}
+
+        assert by_orig["SUPER_14_HAP2"].new_name == "SUPER_1A_HAP2"
+        assert by_orig["SUPER_9_HAP2"].new_name  == "SUPER_1B_HAP2"
+        assert by_orig["SUPER_5_HAP2"].new_name  == "SUPER_7A_HAP2"
+        assert by_orig["SUPER_5_HAP2"].needs_reverse_complement is True
+        assert by_orig["SUPER_14_HAP2"].needs_reverse_complement is False
+
+    def test_hap_suffix_mismatch_no_subgenome(self, tmp_path):
+        """Table from _HAP1 correctly applied to _HAP2 for plain numeric suffixes."""
+        table = self._write_table(tmp_path, [
+            "SUPER_3_HAP1\tchr_1\tSUPER_1_HAP1\t1000\t900\t0.9\t800\t100\tno\n",
+            "SUPER_1_HAP1\tchr_2\tSUPER_2_HAP1\t1000\t900\t0.9\t100\t800\tyes\n",
+        ])
+        sequences = {"SUPER_3_HAP2": "A" * 100, "SUPER_1_HAP2": "T" * 100}
+        assignments, _ = load_mapping_table_assignments(
+            table, sequences, query_chromosome_prefix="SUPER_", output_prefix="SUPER_"
+        )
+        by_orig = {a.original_name: a for a in assignments}
+        assert by_orig["SUPER_3_HAP2"].new_name == "SUPER_1_HAP2"
+        assert by_orig["SUPER_1_HAP2"].new_name == "SUPER_2_HAP2"
+        assert by_orig["SUPER_1_HAP2"].needs_reverse_complement is True
