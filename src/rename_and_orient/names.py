@@ -46,8 +46,15 @@ def extract_chromosome_suffix(name: str, prefix: str = "SUPER_") -> str:
 
 
 def parse_unloc_name(name: str) -> Tuple[str, int]:
-    """Parse unlocalized contig name into (parent_chromosome, unloc_number)."""
-    parts = name.split("_unloc_")
-    parent = parts[0]
+    """Parse unlocalized contig name into (parent_chromosome, unloc_number).
+
+    Handles haplotype-tagged unloc contigs (e.g. SUPER_1_unloc_2_HAP1), where
+    the _HAPn suffix trails the unloc number rather than the parent name.
+    """
+    hap_match = _HAP_SUFFIX_RE.search(name)
+    hap_suffix = hap_match.group(0) if hap_match else ""
+    base_name = strip_hap_suffix(name)
+    parts = base_name.split("_unloc_")
+    parent = parts[0] + hap_suffix
     unloc_num = int(parts[1]) if len(parts) > 1 else 0
     return parent, unloc_num

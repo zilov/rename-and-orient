@@ -1,6 +1,6 @@
 [project]
 name = "rename-and-orient"
-version = "1.2.0"
+version = "1.2.1"
 description = "Rename and orient chromosomes based on reference alignment (PAF format)"
 readme = "README.md"
 authors = [
