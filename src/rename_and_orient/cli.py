@@ -1,5 +1,5 @@
 """Command-line interface entry point."""
-__version__ = "1.2.0"
+__version__ = "1.2.2"
 
 import argparse
 import sys
@@ -163,6 +163,8 @@ def _write_and_validate(
 def main():
     """Main entry point."""
     args = parse_args()
+
+    print(f"rename-and-orient version {__version__}")
 
     qpfx = args.query_chromosome_prefix
     opfx = args.output_chromosome_prefix
