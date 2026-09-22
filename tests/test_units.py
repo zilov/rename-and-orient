@@ -861,3 +861,54 @@ class TestLoadMappingTable:
             table, sequences, query_chromosome_prefix="SUPER_", output_prefix="chr_"
         )
         assert assignments[0].new_name == "chr_1"
+
+    # ------------------------------------------------------- haplotype suffix
+
+    def test_hap_suffix_kept_in_name_stripped_from_suffix(self, tmp_path):
+        """_HAPn is preserved in new_name but excluded from new_suffix."""
+        table = self._write_table(tmp_path, [
+            "SUPER_25_HAP1\tchr_21\tSUPER_21_HAP1\t1000\t900\t0.9\t100\t800\tyes\n",
+        ])
+        sequences = {"SUPER_25_HAP1": "A" * 100}
+        assignments, _ = load_mapping_table_assignments(table, sequences)
+        a = assignments[0]
+        assert a.new_name == "SUPER_21_HAP1"
+        assert a.new_suffix == "21"
+        assert a.needs_reverse_complement is True
+
+    def test_hap_chr_not_in_table_kept_with_bare_suffix(self, tmp_path):
+        """Hap-tagged chromosome missing from the table keeps its name, bare suffix."""
+        table = self._write_table(tmp_path, [
+            "SUPER_25_HAP1\tchr_21\tSUPER_21_HAP1\t1000\t900\t0.9\t100\t800\tyes\n",
+        ])
+        sequences = {"SUPER_25_HAP1": "A" * 100, "SUPER_1_HAP1": "C" * 100}
+        assignments, _ = load_mapping_table_assignments(table, sequences)
+        by_orig = {a.original_name: a for a in assignments}
+        assert by_orig["SUPER_1_HAP1"].new_name == "SUPER_1_HAP1"
+        assert by_orig["SUPER_1_HAP1"].new_suffix == "1"
+        assert by_orig["SUPER_1_HAP1"].is_sex_chromosome is False
+
+    def test_hap_sex_chromosome(self, tmp_path):
+        """Hap-tagged sex chromosome is detected and keeps its hap suffix."""
+        table = self._write_table(tmp_path, [
+            "SUPER_Z_HAP1\tchr_Z\tSUPER_Z_HAP1\t500\t450\t0.9\t400\t50\tno\n",
+        ])
+        sequences = {"SUPER_Z_HAP1": "N" * 50}
+        assignments, _ = load_mapping_table_assignments(table, sequences)
+        assert assignments[0].new_name == "SUPER_Z_HAP1"
+        assert assignments[0].new_suffix == "Z"
+        assert assignments[0].is_sex_chromosome is True
+
+    def test_hap_assignments_are_sortable(self, tmp_path):
+        """Assignments from hap-tagged input can be sorted for output."""
+        table = self._write_table(tmp_path, [
+            "SUPER_25_HAP1\tchr_21\tSUPER_21_HAP1\t1000\t900\t0.9\t100\t800\tyes\n",
+        ])
+        sequences = {
+            "SUPER_25_HAP1": "A" * 100,
+            "SUPER_1_HAP1": "C" * 100,
+            "SUPER_Z_HAP1": "N" * 100,
+        }
+        assignments, _ = load_mapping_table_assignments(table, sequences)
+        ordered = [a.new_name for a in sort_assignments_for_output(assignments)]
+        assert ordered == ["SUPER_1_HAP1", "SUPER_21_HAP1", "SUPER_Z_HAP1"]

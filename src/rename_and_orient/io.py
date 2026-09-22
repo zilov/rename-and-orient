@@ -6,7 +6,13 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 from .models import ChromosomeMapping, FinalChromosomeAssignment, PAFRecord, UnlocMapping
-from .names import extract_chromosome_suffix, is_sex_chromosome_suffix, is_unloc_contig
+from .names import (
+    _HAP_SUFFIX_RE,
+    extract_chromosome_suffix,
+    is_sex_chromosome_suffix,
+    is_unloc_contig,
+    strip_hap_suffix,
+)
 
 
 def read_fasta(fasta_path: Path) -> Dict[str, str]:
@@ -208,6 +214,26 @@ def calculate_genome_length(fasta_path: Path) -> int:
     return sum(len(seq) for seq in sequences.values())
 
 
+def _unloc_output_name(
+    unloc: UnlocMapping,
+    parent_suffix_lookup: Dict[str, str],
+    output_prefix: str
+) -> Tuple[str, str]:
+    """Build the output name for an unloc contig, returning (new_name, parent_suffix).
+
+    A _HAPn tag belongs to the scaffold and trails the unloc number
+    (SUPER_1_unloc_2_HAP1), so it is never part of the parent suffix.
+    """
+    new_parent_suffix = parent_suffix_lookup.get(
+        unloc.parent_chromosome,
+        strip_hap_suffix(extract_chromosome_suffix(unloc.parent_chromosome, output_prefix))
+    )
+    hap_match = _HAP_SUFFIX_RE.search(unloc.contig_name)
+    hap_str = hap_match.group(0) if hap_match else ""
+    new_name = f"{output_prefix}{new_parent_suffix}_unloc_{unloc.unloc_number}{hap_str}"
+    return new_name, new_parent_suffix
+
+
 def write_fasta(
     sequences: Dict[str, str],
     assignments: List[FinalChromosomeAssignment],
@@ -266,11 +292,7 @@ def write_fasta(
                 if unloc.needs_reverse_complement:
                     unloc_seq = reverse_complement(unloc_seq)
 
-                new_parent_suffix = parent_suffix_lookup.get(
-                    unloc.parent_chromosome,
-                    extract_chromosome_suffix(unloc.parent_chromosome, output_prefix)
-                )
-                new_name = f"{output_prefix}{new_parent_suffix}_unloc_{unloc.unloc_number}"
+                new_name, _ = _unloc_output_name(unloc, parent_suffix_lookup, output_prefix)
 
                 f.write(f">{new_name}\n")
                 for i in range(0, len(unloc_seq), line_width):
@@ -317,11 +339,9 @@ def write_chromosome_list(
             f.write(f"{a.new_name},{a.new_suffix},yes\n")
 
             for unloc in unloc_by_parent_csv.get(a.original_name, []):
-                new_parent_suffix = parent_suffix_lookup.get(
-                    unloc.parent_chromosome,
-                    extract_chromosome_suffix(unloc.parent_chromosome, output_prefix)
+                new_name, new_parent_suffix = _unloc_output_name(
+                    unloc, parent_suffix_lookup, output_prefix
                 )
-                new_name = f"{output_prefix}{new_parent_suffix}_unloc_{unloc.unloc_number}"
                 f.write(f"{new_name},{new_parent_suffix},no\n")
 
     print(f"Chromosome list written to: {output_path}")

@@ -136,6 +136,74 @@ def test_mapping_table_mode_unloc_follow_parent(tmp_path):
     )
 
 
+def test_mapping_table_mode_with_hap_suffixed_names(tmp_path):
+    """Hap-tagged assembly with a partial mapping table renames without crashing."""
+    fasta = tmp_path / "hap1.fa"
+    fasta.write_text(
+        ">SUPER_1_HAP1\nAAAAA\n"
+        ">SUPER_21_HAP1\nCCCCC\n"
+        ">SUPER_25_HAP1\nGGGGG\n"
+        ">SUPER_Z_HAP1\nTTTTT\n"
+    )
+
+    # Only the micros are in the table, as in the real bFalPun1 case.
+    table = tmp_path / "micros.rename.tsv"
+    table.write_text(
+        HEADER
+        + "SUPER_25_HAP1\tchr_21\tSUPER_21_HAP1\t5\t5\t1.0\t0\t5\tyes\n"
+        + "SUPER_21_HAP1\tchr_23\tSUPER_23_HAP1\t5\t5\t1.0\t5\t0\tno\n"
+    )
+
+    out_dir = tmp_path / "out"
+    result = _run(
+        CLI_CMD + [
+            "--fasta", str(fasta),
+            "--mapping-table", str(table),
+            "--output-dir", str(out_dir),
+            "--output-prefix", "result",
+        ]
+    )
+
+    assert result.returncode == 0, f"CLI failed:\n{result.stdout}\n{result.stderr}"
+    headers = [
+        line.strip()[1:]
+        for line in (out_dir / "result.fa").read_text().splitlines()
+        if line.startswith(">")
+    ]
+    assert headers == ["SUPER_1_HAP1", "SUPER_21_HAP1", "SUPER_23_HAP1", "SUPER_Z_HAP1"]
+
+
+def test_mapping_table_mode_hap_unloc_keeps_hap_tag(tmp_path):
+    """Unloc of a hap-tagged parent is renamed with the new number, keeping _HAPn."""
+    fasta = tmp_path / "hap1.fa"
+    fasta.write_text(
+        ">SUPER_25_HAP1\nAAAAA\n>SUPER_25_unloc_1_HAP1\nCCCCC\n"
+    )
+
+    table = tmp_path / "mapping.tsv"
+    table.write_text(
+        HEADER + "SUPER_25_HAP1\tchr_21\tSUPER_21_HAP1\t5\t5\t1.0\t5\t0\tno\n"
+    )
+
+    out_dir = tmp_path / "out"
+    result = _run(
+        CLI_CMD + [
+            "--fasta", str(fasta),
+            "--mapping-table", str(table),
+            "--output-dir", str(out_dir),
+            "--output-prefix", "result",
+        ]
+    )
+
+    assert result.returncode == 0, f"CLI failed:\n{result.stdout}\n{result.stderr}"
+    headers = [
+        line.strip()[1:]
+        for line in (out_dir / "result.fa").read_text().splitlines()
+        if line.startswith(">")
+    ]
+    assert headers == ["SUPER_21_HAP1", "SUPER_21_unloc_1_HAP1"]
+
+
 def test_mapping_table_and_paf_are_mutually_exclusive(tmp_path):
     """Passing both --paf and --mapping-table must produce an error."""
     fasta = tmp_path / "hap.fa"

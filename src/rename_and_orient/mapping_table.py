@@ -4,7 +4,14 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 from .models import FinalChromosomeAssignment, UnlocMapping
-from .names import extract_chromosome_suffix, is_sex_chromosome_suffix, is_unloc_contig, parse_unloc_name
+from .names import (
+    _HAP_SUFFIX_RE,
+    extract_chromosome_suffix,
+    is_sex_chromosome_suffix,
+    is_unloc_contig,
+    parse_unloc_name,
+    strip_hap_suffix,
+)
 
 
 def load_mapping_table_assignments(
@@ -41,9 +48,10 @@ def load_mapping_table_assignments(
 
     def _suffix_from_renamed(renamed_to: str) -> str:
         """Extract the bare chromosomal suffix (e.g. '1', 'X') from renamed_to
-        regardless of which prefix was used in the original run."""
-        m = re.search(r'([A-Z]\d*|\d+)$', renamed_to, re.IGNORECASE)
-        return m.group(1) if m else renamed_to
+        regardless of which prefix or _HAPn suffix was used in the original run."""
+        base = strip_hap_suffix(renamed_to)
+        m = re.search(r'([A-Z]\d*|\d+)$', base, re.IGNORECASE)
+        return m.group(1) if m else base
 
     parent_new_suffix = {
         q: _suffix_from_renamed(info["renamed_to"])
@@ -56,14 +64,18 @@ def load_mapping_table_assignments(
         if n.startswith(query_chromosome_prefix) and not is_unloc_contig(n)
     ):
         if orig not in table_map:
-            suffix = extract_chromosome_suffix(orig, query_chromosome_prefix)
+            suffix = strip_hap_suffix(extract_chromosome_suffix(orig, query_chromosome_prefix))
             print(f"  Warning: {orig} not in mapping table -- keeping original suffix")
         else:
             suffix = _suffix_from_renamed(table_map[orig]["renamed_to"])
         needs_rc = table_map[orig]["needs_rc"] if orig in table_map else False
+        # The _HAPn tag belongs to the scaffold, not to the chromosome number:
+        # keep it in the output name but never in new_suffix (which is sorted as int).
+        hap_match = _HAP_SUFFIX_RE.search(orig)
+        hap_str = hap_match.group(0) if hap_match else ""
         assignments.append(FinalChromosomeAssignment(
             original_name=orig,
-            new_name=f"{output_prefix}{suffix}",
+            new_name=f"{output_prefix}{suffix}{hap_str}",
             new_suffix=suffix,
             needs_reverse_complement=needs_rc,
             is_sex_chromosome=is_sex_chromosome_suffix(suffix),

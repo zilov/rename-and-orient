@@ -43,6 +43,32 @@ rename-and-orient \
   --output-prefix ilMysSpe1.hap2.1
 ```
 
+#### Mapping table format
+
+The table is a TSV; only three columns are read — `query`, `renamed_to` and
+`needs_reverse_complement` (`yes`/`no`). Any other columns (as produced by
+`<prefix>.mapping.tsv`) are ignored, so a hand-written table can be this short:
+
+```
+query	renamed_to	needs_reverse_complement
+SUPER_25	SUPER_21	yes
+SUPER_23	SUPER_22	yes
+SUPER_21	SUPER_23	no
+SUPER_22	SUPER_24	no
+SUPER_24	SUPER_25	no
+```
+
+**Only list the scaffolds you actually want renamed or flipped.** Everything
+else in the FASTA (including sex chromosomes and scaffolds outside the
+chromosome prefix) keeps its original name and orientation; a warning is
+printed for each one. This makes the mode convenient for fixing just a handful
+of micro-chromosomes after curation.
+
+Haplotype-tagged names are supported: `SUPER_25_HAP1 -> SUPER_21_HAP1` works,
+and the `_HAPn` tag is preserved in the output even for scaffolds that are not
+in the table (`SUPER_1_HAP1` stays `SUPER_1_HAP1`, its unlocs become
+`SUPER_21_unloc_1_HAP1`).
+
 ## Options
 
 | Option | Short | Default | Description |
