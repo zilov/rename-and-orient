@@ -29,14 +29,22 @@ def load_mapping_table_assignments(
     table_map: Dict[str, Dict] = {}
     with open(mapping_table_path) as fh:
         header = None
-        for line in fh:
-            fields = line.rstrip("\n").split("\t")
+        for lineno, line in enumerate(fh, start=1):
+            if not line.strip():
+                continue
+            fields = line.rstrip("\r\n").split("\t")
             if header is None:
                 header = fields
                 missing = {"query", "renamed_to", "needs_reverse_complement"} - set(header)
                 if missing:
                     raise ValueError(f"Mapping table missing columns: {', '.join(sorted(missing))}")
                 continue
+            if len(fields) < len(header):
+                raise ValueError(
+                    f"Mapping table {mapping_table_path}, line {lineno}: expected "
+                    f"{len(header)} tab-separated fields, got {len(fields)} "
+                    f"(spaces instead of tabs?)"
+                )
             row = dict(zip(header, fields))
             table_map[row["query"]] = {
                 "renamed_to": row["renamed_to"],

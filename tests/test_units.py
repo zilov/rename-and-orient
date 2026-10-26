@@ -912,3 +912,34 @@ class TestLoadMappingTable:
         assignments, _ = load_mapping_table_assignments(table, sequences)
         ordered = [a.new_name for a in sort_assignments_for_output(assignments)]
         assert ordered == ["SUPER_1_HAP1", "SUPER_21_HAP1", "SUPER_Z_HAP1"]
+
+    # ------------------------------------------------------- malformed input
+
+    def test_blank_lines_are_ignored(self, tmp_path):
+        """Trailing and interior blank lines do not break parsing."""
+        table = tmp_path / "short.tsv"
+        table.write_text(
+            "query\trenamed_to\tneeds_reverse_complement\n"
+            "SUPER_10_HAP2\tSUPER_11_HAP2\tno\n"
+            "\n"
+            "SUPER_11_HAP2\tSUPER_10_HAP2\tno\n"
+            "\n"
+        )
+        sequences = {"SUPER_10_HAP2": "A" * 100, "SUPER_11_HAP2": "C" * 100}
+        assignments, _ = load_mapping_table_assignments(table, sequences)
+        names = {a.original_name: a.new_name for a in assignments}
+        assert names == {
+            "SUPER_10_HAP2": "SUPER_11_HAP2",
+            "SUPER_11_HAP2": "SUPER_10_HAP2",
+        }
+
+    def test_short_row_raises_with_line_number(self, tmp_path):
+        """A row with too few fields (e.g. spaces instead of tabs) gives a clear error."""
+        table = tmp_path / "bad_row.tsv"
+        table.write_text(
+            "query\trenamed_to\tneeds_reverse_complement\n"
+            "SUPER_10\tSUPER_11\tno\n"
+            "SUPER_11 SUPER_10 no\n"
+        )
+        with pytest.raises(ValueError, match="line 3"):
+            load_mapping_table_assignments(table, {"SUPER_10": "A"})
