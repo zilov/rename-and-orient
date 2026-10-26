@@ -1,7 +1,11 @@
 name: Release
 
 # On every push to main, publish a GitHub release for the pyproject version if
-# it has none yet, with that version's CHANGELOG.md section as the notes.
+# it has none yet, with that version's CHANGELOG.md section as the notes, then
+# upload the same version to PyPI so `pip install -U rename-and-orient` sees it.
+#
+# PyPI publishing is a job of this workflow rather than a separate `on: release`
+# one: releases created with GITHUB_TOKEN do not trigger other workflows.
 on:
   push:
     branches: [main]
@@ -12,10 +16,13 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      created: ${{ steps.release.outputs.created }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Create release if version is new
+        id: release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -23,6 +30,7 @@ jobs:
           tag="v$version"
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "$tag already released"
+            echo "created=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           awk -v v="$version" '
@@ -35,3 +43,23 @@ jobs:
             exit 1
           fi
           gh release create "$tag" --target "$GITHUB_SHA" --title "$tag" --notes-file notes.md
+          echo "created=true" >> "$GITHUB_OUTPUT"
+
+  pypi:
+    needs: release
+    if: needs.release.outputs.created == 'true'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # PyPI trusted publishing (OIDC), no API token needed
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Build sdist and wheel
+        run: uv build
+
+      - name: Publish to PyPI
+        run: uv publish --trusted-publishing always
