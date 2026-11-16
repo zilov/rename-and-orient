@@ -18,6 +18,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A gzipped input FASTA is decompressed once to a temporary file in `$TMPDIR` (removed when the run ends), because gzip does not support cheap random access. Plain FASTA files are read in place.
 
 ### Added
+- `--plot-alignments` now also writes `plots/alignments_overview.pdf`: a two-page PDF with a grid of every chromosome pair's alignment blocks, page 1 as aligned ("before"), page 2 after the orientation decision (target axis mirrored where RC is decided). Panels are ordered by reference chromosome and rasterized to keep the file small. The per-chromosome plots are still written.
 
 - `--plot-format {png,pdf,svg}` (default `png`) selects the image format for `--plot-alignments`.
 - New modules `fasta`, `paf`, `orientation`, `plotting`; `names` gained `natural_sort_key`, `report` gained `save_mapping_tsv`, `write_chromosome_list` and `print_mapping_summary`. The public API in `rename_and_orient.__init__` is unchanged.

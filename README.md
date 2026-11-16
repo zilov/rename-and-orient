@@ -97,7 +97,7 @@ Progress messages and warnings are logged to stderr; the result tables (mapping 
 | `<prefix>.fa` | Renamed and oriented FASTA |
 | `<prefix>.chromosome.list.csv` | Chromosome list CSV (`name,suffix,yes/no`) |
 | `<prefix>.mapping.tsv` | Mapping summary TSV (PAF mode only) |
-| `plots/` | Alignment scatter plots (if `--plot-alignments`) |
+| `plots/` | Alignment scatter plots and `alignments_overview.pdf` (before/after grids) (if `--plot-alignments`) |
 
 ## Development
 

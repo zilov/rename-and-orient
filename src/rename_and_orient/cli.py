@@ -16,7 +16,12 @@ from .fasta import FastaIndex, calculate_genome_length, index_fasta, write_fasta
 from .mapping_table import load_mapping_table_assignments
 from .models import FinalChromosomeAssignment, UnlocMapping
 from .paf import filter_paf_records, parse_paf, validate_paf_fasta_consistency
-from .plotting import PLOT_FORMATS, MissingPlotDependency, plot_chromosome_alignments
+from .plotting import (
+    PLOT_FORMATS,
+    MissingPlotDependency,
+    plot_alignments_overview,
+    plot_chromosome_alignments,
+)
 from .report import (
     format_assignment_table,
     format_mapping_summary,
@@ -350,6 +355,7 @@ def _run_with_index(
     if args.plot_alignments:
         logger.info("Generating alignment scatter plots...")
         try:
+            plot_alignments_overview(filtered_records, mappings, args.output_dir)
             plot_chromosome_alignments(
                 filtered_records, mappings, args.output_dir, args.plot_format
             )

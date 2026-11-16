@@ -9,6 +9,7 @@ from rename_and_orient import ChromosomeMapping, PAFRecord
 from rename_and_orient.plotting import (
     MissingPlotDependency,
     PlotData,
+    plot_alignments_overview,
     plot_chromosome_alignments,
     prepare_plot_data,
     render_alignment_figure,
@@ -105,6 +106,29 @@ class TestPreparePlotData:
             d.query_name = "x"  # type: ignore[misc]
 
 
+class TestOverviewPdf:
+    def test_two_pages_ordered_by_target(self, synthetic, tmp_path):
+        pytest.importorskip("matplotlib")
+        out = plot_alignments_overview(*synthetic, tmp_path)
+        assert out == tmp_path / "plots" / "alignments_overview.pdf"
+        data = out.read_bytes()
+        assert data.startswith(b"%PDF")
+        assert data.count(b"/Type /Page\n") + data.count(b"/Type /Page ") == 2 \
+            or data.count(b"/Type /Page") - data.count(b"/Type /Pages") == 2
+
+    def test_nothing_to_plot_writes_nothing(self, tmp_path):
+        pytest.importorskip("matplotlib")
+        assert plot_alignments_overview([], [], tmp_path) is None
+        assert not (tmp_path / "plots").exists()
+
+    def test_missing_matplotlib_raises(self, synthetic, tmp_path, monkeypatch):
+        for name in [m for m in sys.modules if m == "matplotlib" or m.startswith("matplotlib.")]:
+            monkeypatch.setitem(sys.modules, name, None)
+        monkeypatch.setitem(sys.modules, "matplotlib", None)
+        with pytest.raises(MissingPlotDependency):
+            plot_alignments_overview(*synthetic, tmp_path)
+
+
 class TestRendering:
     @pytest.mark.parametrize("ext", ["png", "svg", "pdf"])
     def test_render_and_save(self, synthetic, tmp_path, ext):
@@ -149,6 +173,7 @@ def test_cli_plot_alignments(paf_file, fasta_file, tmp_path):
     )
     assert result.returncode == 0, result.stderr
     assert list((tmp_path / "plots").glob("*.svg"))
+    assert (tmp_path / "plots" / "alignments_overview.pdf").stat().st_size > 0
 
 
 def test_cli_warns_without_matplotlib(paf_file, fasta_file, tmp_path):
