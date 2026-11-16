@@ -1,6 +1,8 @@
 """Chromosome name parsing and classification utilities."""
 import re
-from typing import Tuple
+from collections import defaultdict
+
+from .models import UnlocMapping
 
 SEX_CHROMOSOME_SUFFIXES = {'W', 'X', 'Y', 'Z', 'B'}
 _HAP_SUFFIX_RE = re.compile(r'_HAP\d+$', re.IGNORECASE)
@@ -45,7 +47,7 @@ def extract_chromosome_suffix(name: str, prefix: str = "SUPER_") -> str:
     return name
 
 
-def parse_unloc_name(name: str) -> Tuple[str, int]:
+def parse_unloc_name(name: str) -> tuple[str, int]:
     """Parse unlocalized contig name into (parent_chromosome, unloc_number).
 
     Handles haplotype-tagged unloc contigs (e.g. SUPER_1_unloc_2_HAP1), where
@@ -58,3 +60,57 @@ def parse_unloc_name(name: str) -> Tuple[str, int]:
     parent = parts[0] + hap_suffix
     unloc_num = int(parts[1]) if len(parts) > 1 else 0
     return parent, unloc_num
+
+
+def natural_sort_key(name: str, prefix: str = "SUPER_") -> tuple[int, int | float | str]:
+    """Generate a sort key for natural sorting of chromosome names.
+
+    Sorts autosomes numerically (1, 2, ... 10, 11, ...)
+    and sex chromosomes alphabetically after autosomes.
+
+    Args:
+        name: Chromosome name (e.g., "SUPER_1", "SUPER_W")
+        prefix: Prefix to strip (default "SUPER_")
+
+    Returns:
+        Tuple for sorting: (is_sex_chr, numeric_or_alpha_key)
+    """
+    suffix = extract_chromosome_suffix(name, prefix)
+
+    if is_sex_chromosome_suffix(suffix):
+        return (1, suffix)
+    else:
+        try:
+            return (0, int(suffix))
+        except ValueError:
+            return (0, float('inf'))
+
+
+def _unloc_output_name(
+    unloc: UnlocMapping,
+    parent_suffix_lookup: dict[str, str],
+    output_prefix: str
+) -> tuple[str, str]:
+    """Build the output name for an unloc contig, returning (new_name, parent_suffix).
+
+    A _HAPn tag belongs to the scaffold and trails the unloc number
+    (SUPER_1_unloc_2_HAP1), so it is never part of the parent suffix.
+    """
+    new_parent_suffix = parent_suffix_lookup.get(
+        unloc.parent_chromosome,
+        strip_hap_suffix(extract_chromosome_suffix(unloc.parent_chromosome, output_prefix))
+    )
+    hap_match = _HAP_SUFFIX_RE.search(unloc.contig_name)
+    hap_str = hap_match.group(0) if hap_match else ""
+    new_name = f"{output_prefix}{new_parent_suffix}_unloc_{unloc.unloc_number}{hap_str}"
+    return new_name, new_parent_suffix
+
+
+def group_unlocs_by_parent(unlocs: list[UnlocMapping]) -> dict[str, list[UnlocMapping]]:
+    """Group unloc mappings by parent chromosome, each group sorted by unloc number."""
+    by_parent: dict[str, list[UnlocMapping]] = defaultdict(list)
+    for unloc in unlocs:
+        by_parent[unloc.parent_chromosome].append(unloc)
+    for group in by_parent.values():
+        group.sort(key=lambda x: x.unloc_number)
+    return by_parent

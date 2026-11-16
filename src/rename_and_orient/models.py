@@ -19,11 +19,6 @@ class PAFRecord:
     alignment_length: int
     mapping_quality: int
 
-    @property
-    def alignment_block_length(self) -> int:
-        """Length of the alignment block on query."""
-        return self.query_end - self.query_start
-
 
 @dataclass
 class ChromosomeMapping:

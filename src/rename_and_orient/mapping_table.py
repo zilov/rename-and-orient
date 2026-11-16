@@ -1,7 +1,8 @@
 """Load pre-built mapping table for second-haplotype renaming."""
-import re
+import logging
+from collections.abc import Collection
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any
 
 from .models import FinalChromosomeAssignment, UnlocMapping
 from .names import (
@@ -13,20 +14,22 @@ from .names import (
     strip_hap_suffix,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def load_mapping_table_assignments(
     mapping_table_path: Path,
-    sequences: Dict[str, str],
+    sequences: Collection[str],
     query_chromosome_prefix: str = "SUPER_",
     output_prefix: str = "SUPER_",
-) -> Tuple[List[FinalChromosomeAssignment], List[UnlocMapping]]:
-    """
-    Build assignments and unloc mappings from a pre-built mapping TSV
-    (produced by a previous run on haplotype 1). Columns used: query,
+) -> tuple[list[FinalChromosomeAssignment], list[UnlocMapping]]:
+    """Build assignments and unloc mappings from a pre-built mapping TSV.
+
+    The TSV is produced by a previous run on haplotype 1. Columns used: query,
     renamed_to, needs_reverse_complement. Unlocs present only in this
     haplotype are mapped via their parent chromosome; they are never RC'd.
     """
-    table_map: Dict[str, Dict] = {}
+    table_map: dict[str, dict[str, Any]] = {}
     with open(mapping_table_path) as fh:
         header = None
         for lineno, line in enumerate(fh, start=1):
@@ -52,28 +55,34 @@ def load_mapping_table_assignments(
             }
     if not table_map:
         raise ValueError(f"Mapping table {mapping_table_path} is empty.")
-    print(f"  Loaded {len(table_map)} entries from mapping table")
+    logger.info("Loaded %d entries from mapping table", len(table_map))
 
     def _suffix_from_renamed(renamed_to: str) -> str:
-        """Extract the bare chromosomal suffix (e.g. '1', 'X') from renamed_to
-        regardless of which prefix or _HAPn suffix was used in the original run."""
+        """Extract the bare chromosomal suffix (e.g. '1', 'X', 'MT') from renamed_to.
+
+        Strips output_prefix (or query_chromosome_prefix, which the table's earlier run
+        may have used) and any _HAPn tag.
+        """
         base = strip_hap_suffix(renamed_to)
-        m = re.search(r'([A-Z]\d*|\d+)$', base, re.IGNORECASE)
-        return m.group(1) if m else base
+        for prefix in (output_prefix, query_chromosome_prefix):
+            if base.startswith(prefix):
+                return base[len(prefix):]
+        # shortcut: unknown prefix is cut at the last '_', so it breaks if the suffix itself has '_'
+        return base.rsplit("_", 1)[-1]
 
     parent_new_suffix = {
         q: _suffix_from_renamed(info["renamed_to"])
         for q, info in table_map.items() if not is_unloc_contig(q)
     }
 
-    assignments: List[FinalChromosomeAssignment] = []
+    assignments: list[FinalChromosomeAssignment] = []
     for orig in (
         n for n in sequences
         if n.startswith(query_chromosome_prefix) and not is_unloc_contig(n)
     ):
         if orig not in table_map:
             suffix = strip_hap_suffix(extract_chromosome_suffix(orig, query_chromosome_prefix))
-            print(f"  Warning: {orig} not in mapping table -- keeping original suffix")
+            logger.warning("%s not in mapping table -- keeping original suffix", orig)
         else:
             suffix = _suffix_from_renamed(table_map[orig]["renamed_to"])
         needs_rc = table_map[orig]["needs_rc"] if orig in table_map else False
@@ -89,19 +98,21 @@ def load_mapping_table_assignments(
             is_sex_chromosome=is_sex_chromosome_suffix(suffix),
         ))
 
-    unloc_mappings: List[UnlocMapping] = []
+    unloc_mappings: list[UnlocMapping] = []
     for contig in (
         n for n in sequences
         if n.startswith(query_chromosome_prefix) and is_unloc_contig(n)
     ):
         parent, unloc_num = parse_unloc_name(contig)
         if parent not in parent_new_suffix:
-            print(f"  Warning: parent '{parent}' for '{contig}' not in mapping table -- skipping")
+            logger.warning("parent '%s' for '%s' not in mapping table -- skipping", parent, contig)
             continue
         unloc_mappings.append(UnlocMapping(
             contig_name=contig, parent_chromosome=parent,
             unloc_number=unloc_num, needs_reverse_complement=False,
         ))
 
-    print(f"  Built {len(assignments)} assignments and {len(unloc_mappings)} unloc mappings")
+    logger.info(
+        "Built %d assignments and %d unloc mappings", len(assignments), len(unloc_mappings)
+    )
     return assignments, unloc_mappings

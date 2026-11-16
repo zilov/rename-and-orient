@@ -73,16 +73,21 @@ in the table (`SUPER_1_HAP1` stays `SUPER_1_HAP1`, its unlocs become
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
-| `--fasta` | `-f` | required | Input FASTA (gzip supported) |
+| `--fasta` | `-f` | required | Input FASTA (gzip supported; a `.gz` input is decompressed once to a temporary file in `$TMPDIR`, removed on exit) |
 | `--paf` | `-p` | required* | PAF alignment file |
 | `--mapping-table` | `-mt` | required* | Pre-built mapping TSV (mutually exclusive with `--paf`) |
 | `--output-dir` | `-d` | `./rename_and_orient` | Output directory |
 | `--output-prefix` | `-o` | FASTA stem | Output file prefix |
-| `--min-coverage` | `-c` | `0.5` | Minimum alignment coverage to rename |
+| `--min-coverage` | `-c` | `0.5` | Minimum alignment coverage to rename (0.0-1.0) |
 | `--query-chromosome-prefix` | `-q` | `SUPER_` | Prefix for query scaffolds |
 | `--output-chromosome-prefix` | `-x` | `SUPER_` | Prefix for output chromosome names |
 | `--reference-chromosome-prefix` | `-r` | auto | Reference chromosome prefix in PAF |
-| `--plot-alignments` | `-P` | off | Generate alignment scatter plots (requires matplotlib) |
+| `--plot-alignments` | `-P` | off | Write `<prefix>.alignments_overview.pdf`: before/after grids of all alignments (requires matplotlib) |
+| `--verbose` | | off | Show debug messages on stderr |
+| `--quiet` | | off | Show only warnings and errors on stderr (mutually exclusive with `--verbose`) |
+| `--log-file` | | none | Also write all messages (debug level, timestamped) to this file |
+
+Progress messages and warnings are logged to stderr; the result tables (mapping summary and final chromosome assignments) are printed to stdout and are not affected by `--quiet`.
 
 ## Output files
 
@@ -91,7 +96,7 @@ in the table (`SUPER_1_HAP1` stays `SUPER_1_HAP1`, its unlocs become
 | `<prefix>.fa` | Renamed and oriented FASTA |
 | `<prefix>.chromosome.list.csv` | Chromosome list CSV (`name,suffix,yes/no`) |
 | `<prefix>.mapping.tsv` | Mapping summary TSV (PAF mode only) |
-| `plots/` | Alignment scatter plots (if `--plot-alignments`) |
+| `<prefix>.alignments_overview.pdf` | Two-page PDF: all alignments as aligned / after orientation (if `--plot-alignments`) |
 
 ## Development
 

@@ -20,3 +20,6 @@ user_config.yaml
 # OS
 .DS_Store
 .pytest_cache/
+
+# Claude Code local worktrees/state
+.claude/

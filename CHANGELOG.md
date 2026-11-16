@@ -4,6 +4,50 @@ All notable changes to this project are documented in this file.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+## [1.3.0] - 2026-11-16
+
+### Changed
+
+- `--version` and `cli.__version__` now come from the installed package metadata, so the version is only defined in `pyproject.toml`.
+- The release workflow now runs the test suite (`uv run --extra plots pytest`) in a separate `test` job before the GitHub release is created and before publishing to PyPI, and `matplotlib` is in the `dev` dependency group so the plotting tests run instead of being skipped.
+- Progress messages and warnings now go through the standard `logging` module instead of `print`. They are written to **stderr** (previously some went to stdout); the result tables (mapping summary and final chromosome assignments) stay on **stdout**. The library never configures logging; a `NullHandler` is installed on the `rename_and_orient` logger.
+- Table formatting moved to the new `rename_and_orient.report` module (`format_assignment_table`, `format_mapping_summary`).
+- A genome length mismatch is raised as `GenomeLengthMismatchError` and reported by `main()` (exit code 1, as before).
+- A missing `--fasta` / `--mapping-table` file is now reported by the argument parser (exit code 2 instead of 1).
+- `reverse_complement` uses `str.translate` and now complements all IUPAC ambiguity codes (R<->Y, K<->M, H<->D, B<->V, S, W, N; both cases) instead of passing them through unchanged. Output for ACGTN-only sequences is identical to before; sequences containing ambiguity codes now differ. Table taken from agp-tpf-utils (MIT).
+- The input FASTA is no longer loaded into memory: `fasta.index_fasta()` indexes it in one pass and records are read and written one at a time, so peak memory is roughly that of the largest single record (2-3x its size) instead of the whole genome (twice, during the length check). Output files are byte-identical to before. `write_fasta` accepts either a dict or a `FastaIndex`; the name-only functions (`validate_paf_fasta_consistency`, `resolve_chromosome_assignments`, `build_unloc_mappings`, `load_mapping_table_assignments`) accept any collection of names. `calculate_genome_length` streams the file.
+- Duplicate sequence names in the input FASTA now raise a `ValueError` (previously the last record silently won). This also applies to `read_fasta`.
+- A gzipped input FASTA is decompressed once to a temporary file in `$TMPDIR` (removed when the run ends), because gzip does not support cheap random access. Plain FASTA files are read in place.
+
+### Added
+- `--plot-alignments` now writes a single `<output-prefix>.alignments_overview.pdf` next to the other outputs instead of per-chromosome images in `plots/`: a two-page PDF with a grid of every chromosome pair's alignment blocks, page 1 as aligned ("before"), page 2 after the orientation decision (target axis mirrored where RC is decided). Panels are ordered by reference chromosome and rasterized to keep the file small.
+
+- New modules `fasta`, `paf`, `orientation`, `plotting`; `names` gained `natural_sort_key`, `report` gained `save_mapping_tsv` and `write_chromosome_list`. The public API in `rename_and_orient.__init__` is unchanged.
+- `plotting.PlotData`, `prepare_plot_data` and `MissingPlotDependency` (an `ImportError`) for plotting with or without matplotlib.
+- `--verbose` (debug messages), `--quiet` (warnings and errors only; result tables are still printed) and `--log-file PATH` (all messages at debug level, with timestamps). No short flags: `-v` is `--version` and `-q` is `--query-chromosome-prefix`.
+
+- Module split: FASTA, PAF, orientation, reporting and plotting code moved out of `io.py` and `alignment.py` into dedicated modules.
+- Plotting uses `matplotlib.figure.Figure` with the Agg canvas (no `pyplot`, no global `matplotlib.use`). A missing matplotlib raises `MissingPlotDependency`; the CLI logs a warning and continues without plots.
+
+- `fasta.index_fasta`, `fasta.FastaIndex` (lazy read-only mapping name -> sequence with `names`, `length()`, `total_length`, `read_sequence()`; a context manager).
+
+### Removed
+- The deprecated `rename_and_orient.io` shim module, the backward-compatible re-exports at the end of `alignment` (`detect_reference_prefix`, `filter_paf_records`, `validate_paf_fasta_consistency`; import them from `rename_and_orient.paf`), `report.print_mapping_summary` (use `print(report.format_mapping_summary(...))`) and `PAFRecord.alignment_block_length`.
+- **Breaking (library API):** `resolve_chromosome_assignments` now returns only the list of assignments; the unused `rc_lookup` dict was dropped.
+- Per-chromosome plotting: `plotting.render_alignment_figure`, `plotting.save_figure` and `plotting.plot_chromosome_alignments` (also its re-export from `alignment`). `--plot-alignments` only ever used `plot_alignments_overview`.
+
+
+### Fixed
+
+- Alignment plots use the real target length (`target_length` from the PAF) to mirror the right-hand panel, instead of `max(target_end)`.
+- The run is refused (exit code 1) when `<output-dir>/<output-prefix>.fa` or `.chromosome.list.csv` would overwrite `--fasta`, `--paf` or `--mapping-table`; previously the input FASTA was truncated.
+- A malformed PAF line (non-numeric field) now raises a `ValueError` naming the file and line number, and PAF lines with fewer than 12 columns are no longer dropped silently: one warning reports how many were skipped.
+- Chromosome names with a non-numeric suffix (`SUPER_1A`, `SUPER_MT`) no longer crash output sorting or `--mapping-table`; they sort after the numeric chromosomes.
+- `--min-coverage` outside 0..1 (e.g. `-c 50`) is now rejected by the argument parser (exit code 2); previously it silently produced a run with nothing renamed.
+- `main()` now reports any `ValueError` (empty mapping table, duplicate FASTA name, no prefix in PAF, malformed PAF line) as a single error line with exit code 1 instead of a traceback.
+
 ## [1.2.4] - 2026-10-26
 
 ### Fixed
