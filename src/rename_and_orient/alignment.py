@@ -182,10 +182,3 @@ def build_chromosome_mappings(
 
     return mappings
 
-
-# Backward-compatible re-exports of names that moved to other modules.
-from .paf import (  # noqa: E402, F401
-    detect_reference_prefix,
-    filter_paf_records,
-    validate_paf_fasta_consistency,
-)

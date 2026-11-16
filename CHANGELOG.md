@@ -11,7 +11,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `--version` and `cli.__version__` now come from the installed package metadata, so the version is only defined in `pyproject.toml`.
 - The release workflow now runs the test suite (`uv run --extra plots pytest`) before building and publishing to PyPI, and `matplotlib` is in the `dev` dependency group so the plotting tests run instead of being skipped.
 - Progress messages and warnings now go through the standard `logging` module instead of `print`. They are written to **stderr** (previously some went to stdout); the result tables (mapping summary and final chromosome assignments) stay on **stdout**. The library never configures logging; a `NullHandler` is installed on the `rename_and_orient` logger.
-- Table formatting moved to the new `rename_and_orient.report` module (`format_assignment_table`, `format_mapping_summary`). `io.print_mapping_summary` is kept as a thin wrapper.
+- Table formatting moved to the new `rename_and_orient.report` module (`format_assignment_table`, `format_mapping_summary`).
 - A genome length mismatch is raised as `GenomeLengthMismatchError` and reported by `main()` (exit code 1, as before).
 - A missing `--fasta` / `--mapping-table` file is now reported by the argument parser (exit code 2 instead of 1).
 - `reverse_complement` uses `str.translate` and now complements all IUPAC ambiguity codes (R<->Y, K<->M, H<->D, B<->V, S, W, N; both cases) instead of passing them through unchanged. Output for ACGTN-only sequences is identical to before; sequences containing ambiguity codes now differ. Table taken from agp-tpf-utils (MIT).
@@ -22,21 +22,20 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - `--plot-alignments` now writes a single `<output-prefix>.alignments_overview.pdf` next to the other outputs instead of per-chromosome images in `plots/`: a two-page PDF with a grid of every chromosome pair's alignment blocks, page 1 as aligned ("before"), page 2 after the orientation decision (target axis mirrored where RC is decided). Panels are ordered by reference chromosome and rasterized to keep the file small.
 
-- New modules `fasta`, `paf`, `orientation`, `plotting`; `names` gained `natural_sort_key`, `report` gained `save_mapping_tsv`, `write_chromosome_list` and `print_mapping_summary`. The public API in `rename_and_orient.__init__` is unchanged.
+- New modules `fasta`, `paf`, `orientation`, `plotting`; `names` gained `natural_sort_key`, `report` gained `save_mapping_tsv` and `write_chromosome_list`. The public API in `rename_and_orient.__init__` is unchanged.
 - `plotting.PlotData`, `prepare_plot_data` and `MissingPlotDependency` (an `ImportError`) for plotting with or without matplotlib.
 - `--verbose` (debug messages), `--quiet` (warnings and errors only; result tables are still printed) and `--log-file PATH` (all messages at debug level, with timestamps). No short flags: `-v` is `--version` and `-q` is `--query-chromosome-prefix`.
 
-- Module split: FASTA, PAF, orientation, reporting and plotting code moved out of `io.py` and `alignment.py` into dedicated modules. `alignment.py` still re-exports the moved names.
+- Module split: FASTA, PAF, orientation, reporting and plotting code moved out of `io.py` and `alignment.py` into dedicated modules.
 - Plotting uses `matplotlib.figure.Figure` with the Agg canvas (no `pyplot`, no global `matplotlib.use`). A missing matplotlib raises `MissingPlotDependency`; the CLI logs a warning and continues without plots.
 
 - `fasta.index_fasta`, `fasta.FastaIndex` (lazy read-only mapping name -> sequence with `names`, `length()`, `total_length`, `read_sequence()`; a context manager).
 
 ### Removed
+- The deprecated `rename_and_orient.io` shim module, the backward-compatible re-exports at the end of `alignment` (`detect_reference_prefix`, `filter_paf_records`, `validate_paf_fasta_consistency`; import them from `rename_and_orient.paf`), `report.print_mapping_summary` (use `print(report.format_mapping_summary(...))`) and `PAFRecord.alignment_block_length`.
+- **Breaking (library API):** `resolve_chromosome_assignments` now returns only the list of assignments; the unused `rc_lookup` dict was dropped.
 - Per-chromosome plotting: `plotting.render_alignment_figure`, `plotting.save_figure` and `plotting.plot_chromosome_alignments` (also its re-export from `alignment`). `--plot-alignments` only ever used `plot_alignments_overview`.
 
-### Deprecated
-
-- `rename_and_orient.io` is a deprecated shim that re-exports the old names and emits a `DeprecationWarning` on import. Import from `rename_and_orient.fasta`, `.paf`, `.report` or `.names` instead.
 
 ### Fixed
 

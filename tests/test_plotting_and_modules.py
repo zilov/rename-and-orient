@@ -1,5 +1,4 @@
-"""Tests for the module split, the deprecated io shim and the plotting refactor."""
-import importlib
+"""Tests for the module split, the plotting refactor."""
 import subprocess
 import sys
 
@@ -42,18 +41,6 @@ def synthetic():
     return records, mappings
 
 
-def test_io_shim_warns_and_exposes_old_names():
-    sys.modules.pop("rename_and_orient.io", None)
-    with pytest.warns(DeprecationWarning, match="rename_and_orient.io is deprecated"):
-        io = importlib.import_module("rename_and_orient.io")
-    for name in (
-        "read_fasta", "write_fasta", "calculate_genome_length", "reverse_complement",
-        "parse_paf", "natural_sort_key", "print_mapping_summary", "save_mapping_tsv",
-        "write_chromosome_list", "_unloc_output_name", "_RC_TABLE",
-    ):
-        assert hasattr(io, name)
-
-
 def test_public_api_and_cli_emit_no_deprecation_warning(paf_file, fasta_file, tmp_path):
     code = (
         "import warnings; warnings.simplefilter('error', DeprecationWarning);"
@@ -66,15 +53,6 @@ def test_public_api_and_cli_emit_no_deprecation_warning(paf_file, fasta_file, tm
         capture_output=True, text=True,
     )
     assert result.returncode == 0, result.stderr
-
-
-def test_alignment_reexports_moved_names():
-    from rename_and_orient import alignment
-    for name in (
-        "needs_reverse_complement_by_correlation", "filter_paf_records",
-        "detect_reference_prefix", "validate_paf_fasta_consistency",
-    ):
-        assert callable(getattr(alignment, name))
 
 
 class TestPreparePlotData:

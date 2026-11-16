@@ -5,13 +5,12 @@ import os
 import shutil
 import tempfile
 import weakref
-from collections import defaultdict
 from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import BinaryIO, NamedTuple, TextIO
 
 from .models import FinalChromosomeAssignment, UnlocMapping
-from .names import _unloc_output_name
+from .names import _unloc_output_name, group_unlocs_by_parent
 
 logger = logging.getLogger(__name__)
 
@@ -308,11 +307,7 @@ def write_fasta(
     parent_suffix_lookup = {a.original_name: a.new_suffix for a in assignments}
     processed_sequences = set()
 
-    unloc_by_parent: dict[str, list[UnlocMapping]] = defaultdict(list)
-    for unloc in unloc_mappings:
-        unloc_by_parent[unloc.parent_chromosome].append(unloc)
-    for parent in unloc_by_parent:
-        unloc_by_parent[parent].sort(key=lambda x: x.unloc_number)
+    unloc_by_parent = group_unlocs_by_parent(unloc_mappings)
 
     with open(output_path, 'w') as f:
         for a in assignments:

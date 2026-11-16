@@ -1,10 +1,9 @@
 """Reports: text tables (returned as strings), mapping TSV and chromosome list files."""
 import logging
-from collections import defaultdict
 from pathlib import Path
 
 from .models import ChromosomeMapping, FinalChromosomeAssignment, UnlocMapping
-from .names import _unloc_output_name, natural_sort_key
+from .names import _unloc_output_name, group_unlocs_by_parent, natural_sort_key
 
 logger = logging.getLogger(__name__)
 
@@ -103,17 +102,13 @@ def write_chromosome_list(
     """
     parent_suffix_lookup = {a.original_name: a.new_suffix for a in assignments}
 
-    unloc_by_parent_csv: dict[str, list[UnlocMapping]] = defaultdict(list)
-    for unloc in unloc_mappings:
-        unloc_by_parent_csv[unloc.parent_chromosome].append(unloc)
-    for parent in unloc_by_parent_csv:
-        unloc_by_parent_csv[parent].sort(key=lambda x: x.unloc_number)
+    unloc_by_parent = group_unlocs_by_parent(unloc_mappings)
 
     with open(output_path, 'w') as f:
         for a in assignments:
             f.write(f"{a.new_name},{a.new_suffix},yes\n")
 
-            for unloc in unloc_by_parent_csv.get(a.original_name, []):
+            for unloc in unloc_by_parent.get(a.original_name, []):
                 new_name, new_parent_suffix = _unloc_output_name(
                     unloc, parent_suffix_lookup, output_prefix
                 )
@@ -121,13 +116,3 @@ def write_chromosome_list(
 
     logger.info("Chromosome list written to: %s", output_path)
 
-
-def print_mapping_summary(mappings: list[ChromosomeMapping]) -> None:
-    """Print summary of chromosome mappings to stdout.
-
-    Thin wrapper around :func:`format_mapping_summary`.
-
-    Args:
-        mappings: List of ChromosomeMapping objects
-    """
-    print(format_mapping_summary(mappings))

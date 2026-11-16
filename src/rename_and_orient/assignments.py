@@ -32,7 +32,7 @@ def resolve_chromosome_assignments(
     sequences: Collection[str],
     query_chromosome_prefix: str = "SUPER_",
     output_prefix: str = "SUPER_"
-) -> tuple[list[FinalChromosomeAssignment], dict[str, bool]]:
+) -> list[FinalChromosomeAssignment]:
     """Resolve chromosome assignments with conflict handling and sex chromosome logic.
 
     This function handles:
@@ -49,12 +49,9 @@ def resolve_chromosome_assignments(
         output_prefix: Output chromosome prefix (e.g., "SUPER_", "chr_", "chr", "")
 
     Returns:
-        Tuple of:
-        - List of FinalChromosomeAssignment for all chromosomes
-        - Dictionary mapping original names to needs_reverse_complement flag
+        List of FinalChromosomeAssignment for all chromosomes
     """
     assignments = []
-    rc_lookup = {}
 
     all_chr_names = {name for name in sequences
                      if name.startswith(query_chromosome_prefix) and "_unloc_" not in name}
@@ -107,7 +104,6 @@ def resolve_chromosome_assignments(
             is_sex_chromosome=True
         )
         assignments.append(assignment)
-        rc_lookup[m.query_name] = m.needs_reverse_complement
 
     target_to_autosomes = defaultdict(list)
     autosomes_to_sex_target = []
@@ -189,7 +185,6 @@ def resolve_chromosome_assignments(
             is_sex_chromosome=False
         )
         assignments.append(assignment)
-        rc_lookup[m.query_name] = m.needs_reverse_complement
 
     for name in unmapped_names:
         suffix = extract_chromosome_suffix(name, query_chromosome_prefix)
@@ -202,10 +197,9 @@ def resolve_chromosome_assignments(
             is_sex_chromosome=is_sex_chromosome_suffix(suffix)
         )
         assignments.append(assignment)
-        rc_lookup[name] = False
         logger.info("Unmapped: %s -> %s%s (keeping orientation)", name, output_prefix, suffix)
 
-    return assignments, rc_lookup
+    return assignments
 
 
 def sort_assignments_for_output(

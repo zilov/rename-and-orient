@@ -1,5 +1,6 @@
 """Chromosome name parsing and classification utilities."""
 import re
+from collections import defaultdict
 
 from .models import UnlocMapping
 
@@ -103,3 +104,13 @@ def _unloc_output_name(
     hap_str = hap_match.group(0) if hap_match else ""
     new_name = f"{output_prefix}{new_parent_suffix}_unloc_{unloc.unloc_number}{hap_str}"
     return new_name, new_parent_suffix
+
+
+def group_unlocs_by_parent(unlocs: list[UnlocMapping]) -> dict[str, list[UnlocMapping]]:
+    """Group unloc mappings by parent chromosome, each group sorted by unloc number."""
+    by_parent: dict[str, list[UnlocMapping]] = defaultdict(list)
+    for unloc in unlocs:
+        by_parent[unloc.parent_chromosome].append(unloc)
+    for group in by_parent.values():
+        group.sort(key=lambda x: x.unloc_number)
+    return by_parent

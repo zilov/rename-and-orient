@@ -354,7 +354,7 @@ class TestResolveChromosomeAssignments:
             ChromosomeMapping("SUPER_2", 8, "chr_2", 8, 1.0, 0, 8, True, "chr_"),
         ]
 
-        assignments, rc_lookup = resolve_chromosome_assignments(
+        assignments = resolve_chromosome_assignments(
             mappings, sample_fasta_dict, "SUPER_", "SUPER_"
         )
 
@@ -378,7 +378,7 @@ class TestResolveChromosomeAssignments:
             ChromosomeMapping("SUPER_W", 8, "chr_W", 8, 1.0, 8, 0, False, "chr_"),
         ]
 
-        assignments, rc_lookup = resolve_chromosome_assignments(
+        assignments = resolve_chromosome_assignments(
             mappings, sample_fasta_dict, "SUPER_", "SUPER_"
         )
 
@@ -397,7 +397,7 @@ class TestResolveChromosomeAssignments:
             ChromosomeMapping("SUPER_2_HAP2", 8, "chr_2", 8, 1.0, 0, 8, True, "chr_"),
         ]
 
-        assignments, rc_lookup = resolve_chromosome_assignments(
+        assignments = resolve_chromosome_assignments(
             mappings, fasta, "SUPER_", "SUPER_"
         )
 
@@ -423,7 +423,7 @@ class TestResolveChromosomeAssignments:
             ChromosomeMapping("SUPER_1_HAP2", 8, "chr_1", 8, 1.0, 8, 0, False, "chr_"),
         ]
 
-        assignments, rc_lookup = resolve_chromosome_assignments(
+        assignments = resolve_chromosome_assignments(
             mappings, fasta, "SUPER_", "SUPER_"
         )
 

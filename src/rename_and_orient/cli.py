@@ -370,7 +370,7 @@ def _run_with_index(
 
     logger.info("Resolving chromosome assignments...")
     logger.info("Input prefix: '%s' -> Output prefix: '%s'", qpfx, opfx)
-    assignments, _ = resolve_chromosome_assignments(mappings, sequences, qpfx, opfx)
+    assignments = resolve_chromosome_assignments(mappings, sequences, qpfx, opfx)
 
     unloc_mappings = build_unloc_mappings(sequences, mappings)
     if unloc_mappings:
