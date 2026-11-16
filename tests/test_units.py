@@ -1002,3 +1002,29 @@ class TestOrientationByCorrelation:
         from rename_and_orient.orientation import needs_reverse_complement_by_correlation
         recs = parse_paf(test_data_dir / "super24_inversion.paf")
         assert needs_reverse_complement_by_correlation(recs, recs[0].target_length) is True
+
+
+def test_sort_assignments_non_numeric_suffix_after_numeric():
+    """Regression: SUPER_1A / SUPER_MT used to crash with int('1A')."""
+    mk = lambda s: FinalChromosomeAssignment(
+        original_name=f"o{s}", new_name=f"SUPER_{s}", new_suffix=s,
+        needs_reverse_complement=False, is_sex_chromosome=(s == "X"),
+    )
+    out = sort_assignments_for_output([mk(s) for s in ["X", "MT", "10", "1A", "2", "1"]])
+    assert [a.new_suffix for a in out] == ["1", "2", "10", "1A", "MT", "X"]
+
+
+def test_mapping_table_suffix_non_numeric(tmp_path):
+    """Regression: SUPER_MT used to give suffix 'T' via regex guessing."""
+    table = tmp_path / "m.tsv"
+    table.write_text(
+        TestLoadMappingTable.HEADER
+        + "SUPER_7\tt\tSUPER_MT\t10\t9\t0.9\t9\t0\tno\n"
+        + "SUPER_8\tt\tSUPER_1A_HAP2\t10\t9\t0.9\t9\t0\tno\n"
+    )
+    assignments, _ = load_mapping_table_assignments(
+        table, {"SUPER_7": "A", "SUPER_8": "A"}
+    )
+    assert {a.original_name: a.new_suffix for a in assignments} == {
+        "SUPER_7": "MT", "SUPER_8": "1A",
+    }

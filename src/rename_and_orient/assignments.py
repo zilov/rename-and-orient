@@ -222,7 +222,10 @@ def sort_assignments_for_output(
     autosomes = [a for a in assignments if not a.is_sex_chromosome]
     sex_chrs = [a for a in assignments if a.is_sex_chromosome]
 
-    autosomes.sort(key=lambda x: int(x.new_suffix))
+    # non-numeric suffixes (1A, MT) sort after numeric ones instead of crashing
+    autosomes.sort(
+        key=lambda x: (0, int(x.new_suffix)) if x.new_suffix.isdigit() else (1, x.new_suffix)
+    )
     sex_chrs.sort(key=lambda x: x.new_suffix)
 
     return autosomes + sex_chrs

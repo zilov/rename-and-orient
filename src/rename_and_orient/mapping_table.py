@@ -1,6 +1,5 @@
 """Load pre-built mapping table for second-haplotype renaming."""
 import logging
-import re
 from collections.abc import Collection
 from pathlib import Path
 from typing import Any
@@ -59,13 +58,17 @@ def load_mapping_table_assignments(
     logger.info("Loaded %d entries from mapping table", len(table_map))
 
     def _suffix_from_renamed(renamed_to: str) -> str:
-        """Extract the bare chromosomal suffix (e.g. '1', 'X') from renamed_to.
+        """Extract the bare chromosomal suffix (e.g. '1', 'X', 'MT') from renamed_to.
 
-        Works regardless of which prefix or _HAPn suffix was used in the original run.
+        Strips output_prefix (or query_chromosome_prefix, which the table's earlier run
+        may have used) and any _HAPn tag.
         """
         base = strip_hap_suffix(renamed_to)
-        m = re.search(r'([A-Z]\d*|\d+)$', base, re.IGNORECASE)
-        return m.group(1) if m else base
+        for prefix in (output_prefix, query_chromosome_prefix):
+            if base.startswith(prefix):
+                return base[len(prefix):]
+        # shortcut: unknown prefix is cut at the last '_', so it breaks if the suffix itself has '_'
+        return base.rsplit("_", 1)[-1]
 
     parent_new_suffix = {
         q: _suffix_from_renamed(info["renamed_to"])
