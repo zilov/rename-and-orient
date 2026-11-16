@@ -262,7 +262,7 @@ def main() -> None:
     _setup_logging(args.verbose, args.quiet, args.log_file)
     try:
         _run(args)
-    except GenomeLengthMismatchError as exc:
+    except (GenomeLengthMismatchError, ValueError) as exc:
         logger.error("%s", exc)
         sys.exit(1)
 

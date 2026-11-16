@@ -42,6 +42,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A malformed PAF line (non-numeric field) now raises a `ValueError` naming the file and line number, and PAF lines with fewer than 12 columns are no longer dropped silently: one warning reports how many were skipped.
 - Chromosome names with a non-numeric suffix (`SUPER_1A`, `SUPER_MT`) no longer crash output sorting or `--mapping-table`; they sort after the numeric chromosomes.
 - `--min-coverage` outside 0..1 (e.g. `-c 50`) is now rejected by the argument parser (exit code 2); previously it silently produced a run with nothing renamed.
+- `main()` now reports any `ValueError` (empty mapping table, duplicate FASTA name, no prefix in PAF, malformed PAF line) as a single error line with exit code 1 instead of a traceback.
 
 ## [1.2.4] - 2026-10-26
 

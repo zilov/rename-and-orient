@@ -258,3 +258,25 @@ def test_min_coverage_in_range_accepted(paf_file, fasta_file, tmp_path):
     for cov in ("0", "0.5", "1"):
         result = _cov_run(paf_file, fasta_file, tmp_path, cov)
         assert result.returncode == 0, result.stderr
+
+
+def test_value_error_reported_without_traceback(paf_file, tmp_path):
+    fasta = tmp_path / "dup.fa"
+    fasta.write_text(">SUPER_1\nACGT\n>SUPER_1\nACGT\n")
+    result = _run(CLI_CMD + [
+        "--fasta", str(fasta), "--paf", str(paf_file),
+        "--output-dir", str(tmp_path / "out"),
+    ])
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr
+
+
+def test_malformed_paf_reported_without_traceback(fasta_file, tmp_path):
+    paf = tmp_path / "bad.paf"
+    paf.write_text("SUPER_1\tx\t0\t10\t+\tchr_1\t10\t0\t10\t10\t10\t60\n")
+    result = _run(CLI_CMD + [
+        "--fasta", str(fasta_file), "--paf", str(paf),
+        "--output-dir", str(tmp_path / "out"),
+    ])
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr
