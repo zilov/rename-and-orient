@@ -1,0 +1,17 @@
+name: CI
+
+# Run the tests on every pull request (release.yml only runs on push to main).
+on:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Run tests
+        run: uv run --extra plots pytest
