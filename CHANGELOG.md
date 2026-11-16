@@ -8,6 +8,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- `--version` and `cli.__version__` now come from the installed package metadata, so the version is only defined in `pyproject.toml`.
 - The release workflow now runs the test suite (`uv run --extra plots pytest`) before building and publishing to PyPI, and `matplotlib` is in the `dev` dependency group so the plotting tests run instead of being skipped.
 - Progress messages and warnings now go through the standard `logging` module instead of `print`. They are written to **stderr** (previously some went to stdout); the result tables (mapping summary and final chromosome assignments) stay on **stdout**. The library never configures logging; a `NullHandler` is installed on the `rename_and_orient` logger.
 - Table formatting moved to the new `rename_and_orient.report` module (`format_assignment_table`, `format_mapping_summary`). `io.print_mapping_summary` is kept as a thin wrapper.

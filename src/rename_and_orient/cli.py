@@ -1,9 +1,8 @@
 """Command-line interface entry point."""
-__version__ = "1.2.4"
-
 import argparse
 import logging
 import sys
+from importlib.metadata import version
 from pathlib import Path
 
 from .alignment import build_chromosome_mappings
@@ -27,6 +26,7 @@ from .report import (
 # Hard-coded: __name__ is "__main__" under `python -m rename_and_orient.cli`.
 PACKAGE_LOGGER_NAME = "rename_and_orient"
 logger = logging.getLogger(f"{PACKAGE_LOGGER_NAME}.cli")
+__version__ = version("rename-and-orient")
 
 
 class GenomeLengthMismatchError(RuntimeError):
