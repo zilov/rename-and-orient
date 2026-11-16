@@ -200,6 +200,8 @@ def parse_args() -> argparse.Namespace:
         parser.error(f"FASTA file not found: {args.fasta}")
     if args.mapping_table is not None and not args.mapping_table.exists():
         parser.error(f"Mapping table not found: {args.mapping_table}")
+    if not 0 <= args.min_coverage <= 1:
+        parser.error(f"--min-coverage must be between 0 and 1, got {args.min_coverage}")
 
     if args.output_prefix is None:
         args.output_prefix = args.fasta.stem

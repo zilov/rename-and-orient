@@ -239,3 +239,22 @@ def test_output_colliding_with_input_fasta_is_refused(tmp_path):
     assert "overwrite input" in result.stderr
     assert "Traceback" not in result.stderr
     assert fasta.read_text() == ">SUPER_1\nATCGATCGATCG\n"
+
+
+def _cov_run(paf_file, fasta_file, tmp_path, cov):
+    return _run(CLI_CMD + [
+        "--fasta", str(fasta_file), "--paf", str(paf_file),
+        "--output-dir", str(tmp_path / "out"), "-c", cov,
+    ])
+
+
+def test_min_coverage_out_of_range_rejected(paf_file, fasta_file, tmp_path):
+    result = _cov_run(paf_file, fasta_file, tmp_path, "50")
+    assert result.returncode == 2
+    assert "--min-coverage" in result.stderr
+
+
+def test_min_coverage_in_range_accepted(paf_file, fasta_file, tmp_path):
+    for cov in ("0", "0.5", "1"):
+        result = _cov_run(paf_file, fasta_file, tmp_path, cov)
+        assert result.returncode == 0, result.stderr

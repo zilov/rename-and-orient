@@ -78,7 +78,7 @@ in the table (`SUPER_1_HAP1` stays `SUPER_1_HAP1`, its unlocs become
 | `--mapping-table` | `-mt` | required* | Pre-built mapping TSV (mutually exclusive with `--paf`) |
 | `--output-dir` | `-d` | `./rename_and_orient` | Output directory |
 | `--output-prefix` | `-o` | FASTA stem | Output file prefix |
-| `--min-coverage` | `-c` | `0.5` | Minimum alignment coverage to rename |
+| `--min-coverage` | `-c` | `0.5` | Minimum alignment coverage to rename (0.0-1.0) |
 | `--query-chromosome-prefix` | `-q` | `SUPER_` | Prefix for query scaffolds |
 | `--output-chromosome-prefix` | `-x` | `SUPER_` | Prefix for output chromosome names |
 | `--reference-chromosome-prefix` | `-r` | auto | Reference chromosome prefix in PAF |
