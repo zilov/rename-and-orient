@@ -221,3 +221,21 @@ def test_mapping_table_and_paf_are_mutually_exclusive(tmp_path):
         ]
     )
     assert result.returncode != 0
+
+
+def test_output_colliding_with_input_fasta_is_refused(tmp_path):
+    """Default prefix + output dir = input dir must not truncate the input FASTA."""
+    fasta = tmp_path / "genome.fa"
+    fasta.write_text(">SUPER_1\nATCGATCGATCG\n")
+    table = tmp_path / "mapping.tsv"
+    table.write_text(HEADER + "SUPER_1\tchr_1\tSUPER_1\t12\t11\t0.92\t2\t9\tno\n")
+
+    result = _run(
+        CLI_CMD + ["--fasta", str(fasta), "--mapping-table", str(table),
+                   "--output-dir", str(tmp_path)]
+    )
+
+    assert result.returncode != 0
+    assert "overwrite input" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert fasta.read_text() == ">SUPER_1\nATCGATCGATCG\n"
