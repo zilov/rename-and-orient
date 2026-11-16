@@ -9,19 +9,27 @@ from .models import ChromosomeMapping, PAFRecord
 from .names import is_unloc_contig
 
 
-def _pearson_r(xs: List[float], ys: List[float]) -> float:
+def _pearson_r(
+    xs: List[float], ys: List[float], ws: List[float] = None
+) -> float:
     """
-    Pearson correlation coefficient between two lists of floats.
-    Returns 0.0 if fewer than 2 points or zero variance in either variable.
+    Weighted Pearson correlation coefficient between two lists of floats.
+    Weights default to 1 (plain Pearson). Returns 0.0 if fewer than 2 points
+    or zero variance in either variable.
     """
     n = len(xs)
     if n < 2:
         return 0.0
-    mx = sum(xs) / n
-    my = sum(ys) / n
-    num = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
-    sx = sum((x - mx) ** 2 for x in xs) ** 0.5
-    sy = sum((y - my) ** 2 for y in ys) ** 0.5
+    if ws is None:
+        ws = [1.0] * n
+    total_w = sum(ws)
+    if total_w == 0:
+        return 0.0
+    mx = sum(w * x for w, x in zip(ws, xs)) / total_w
+    my = sum(w * y for w, y in zip(ws, ys)) / total_w
+    num = sum(w * (x - mx) * (y - my) for w, x, y in zip(ws, xs, ys))
+    sx = sum(w * (x - mx) ** 2 for w, x in zip(ws, xs)) ** 0.5
+    sy = sum(w * (y - my) ** 2 for w, y in zip(ws, ys)) ** 0.5
     if sx == 0 or sy == 0:
         return 0.0
     return num / (sx * sy)
@@ -37,6 +45,9 @@ def needs_reverse_complement_by_correlation(
 
     For '+' blocks: r = corr(query_mid, target_mid).
     For '-' blocks: r = corr(query_mid, target_length - target_mid).
+
+    Each block is weighted by its query length, so that many short scattered
+    repeat hits cannot outvote a few long syntenic blocks.
 
     The strand whose r is higher wins. This correctly ignores large structural
     inversions (their blocks are scattered -> low r) while syntenic blocks
@@ -57,13 +68,15 @@ def needs_reverse_complement_by_correlation(
     if len(plus_recs) >= 2:
         xs = [(r.query_start + r.query_end) / 2 for r in plus_recs]
         ys = [(r.target_start + r.target_end) / 2 for r in plus_recs]
-        r_plus = _pearson_r(xs, ys)
+        ws = [r.query_end - r.query_start for r in plus_recs]
+        r_plus = _pearson_r(xs, ys, ws)
 
     r_minus = 0.0
     if len(minus_recs) >= 2:
         xs = [(r.query_start + r.query_end) / 2 for r in minus_recs]
         ys = [target_length - (r.target_start + r.target_end) / 2 for r in minus_recs]
-        r_minus = _pearson_r(xs, ys)
+        ws = [r.query_end - r.query_start for r in minus_recs]
+        r_minus = _pearson_r(xs, ys, ws)
 
     # If correlation is uninformative for both strands (< 2 blocks each),
     # fall back to naive length comparison.

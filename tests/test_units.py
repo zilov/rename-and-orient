@@ -943,3 +943,12 @@ class TestLoadMappingTable:
         )
         with pytest.raises(ValueError, match="line 3"):
             load_mapping_table_assignments(table, {"SUPER_10": "A"})
+
+
+class TestOrientationByCorrelation:
+    def test_long_minus_blocks_beat_many_short_scattered_plus_hits(self, test_data_dir):
+        """Regression (ilHysMacu3 SUPER_24): two long '-' blocks form a clean
+        anti-diagonal; ~290 tiny scattered '+' repeat hits must not outvote them."""
+        from rename_and_orient.alignment import needs_reverse_complement_by_correlation
+        recs = parse_paf(test_data_dir / "super24_inversion.paf")
+        assert needs_reverse_complement_by_correlation(recs, recs[0].target_length) is True
