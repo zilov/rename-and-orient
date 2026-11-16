@@ -6,6 +6,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-16
+
 ### Changed
 
 - `--version` and `cli.__version__` now come from the installed package metadata, so the version is only defined in `pyproject.toml`.
