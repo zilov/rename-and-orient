@@ -54,8 +54,8 @@ def resolve_chromosome_assignments(
     assignments = []
 
     all_chr_names = {name for name in sequences
-                     if name.startswith(query_chromosome_prefix) and "_unloc_" not in name}
-    mapped_names = {m.query_name for m in mappings if "_unloc_" not in m.query_name}
+                     if name.startswith(query_chromosome_prefix) and not is_unloc_contig(name)}
+    mapped_names = {m.query_name for m in mappings if not is_unloc_contig(m.query_name)}
     unmapped_names = all_chr_names - mapped_names
 
     autosome_mappings = []
@@ -63,7 +63,7 @@ def resolve_chromosome_assignments(
 
     for m in mappings:
         query_suffix = extract_chromosome_suffix(m.query_name, query_chromosome_prefix)
-        if "_unloc_" in m.query_name:
+        if is_unloc_contig(m.query_name):
             continue
 
         if is_sex_chromosome_suffix(query_suffix):

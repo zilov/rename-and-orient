@@ -72,8 +72,7 @@ def calculate_target_alignments(records: list[PAFRecord]) -> dict[str, dict[str,
 
     target_stats: dict[str, dict[str, int]] = {}
     for target_name, strands in target_intervals.items():
-        plus_len = sum(e - s for s, e in merge_intervals(strands['+'
-                                                                   ]))
+        plus_len = sum(e - s for s, e in merge_intervals(strands['+']))
         minus_len = sum(e - s for s, e in merge_intervals(strands['-']))
         all_intervals = strands['+'] + strands['-']
         total_len = sum(e - s for s, e in merge_intervals(all_intervals))

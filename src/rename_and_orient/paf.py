@@ -6,6 +6,7 @@ from collections.abc import Collection
 from pathlib import Path
 
 from .models import PAFRecord
+from .names import is_unloc_contig
 
 logger = logging.getLogger(__name__)
 
@@ -166,12 +167,12 @@ def validate_paf_fasta_consistency(
     paf_chromosomes = set()
     for record in paf_records:
         if (record.query_name.startswith(query_chromosome_prefix) and
-                "_unloc_" not in record.query_name):
+                not is_unloc_contig(record.query_name)):
             paf_chromosomes.add(record.query_name)
 
     fasta_chromosomes = set()
     for name in fasta_sequences:
-        if name.startswith(query_chromosome_prefix) and "_unloc_" not in name:
+        if name.startswith(query_chromosome_prefix) and not is_unloc_contig(name):
             fasta_chromosomes.add(name)
 
     in_paf_not_fasta = sorted(paf_chromosomes - fasta_chromosomes)
