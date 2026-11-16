@@ -109,8 +109,9 @@ class TestPreparePlotData:
 class TestOverviewPdf:
     def test_two_pages_ordered_by_target(self, synthetic, tmp_path):
         pytest.importorskip("matplotlib")
-        out = plot_alignments_overview(*synthetic, tmp_path)
-        assert out == tmp_path / "plots" / "alignments_overview.pdf"
+        target = tmp_path / "out" / "x.alignments_overview.pdf"
+        out = plot_alignments_overview(*synthetic, target)
+        assert out == target
         data = out.read_bytes()
         assert data.startswith(b"%PDF")
         assert data.count(b"/Type /Page\n") + data.count(b"/Type /Page ") == 2 \
@@ -118,15 +119,16 @@ class TestOverviewPdf:
 
     def test_nothing_to_plot_writes_nothing(self, tmp_path):
         pytest.importorskip("matplotlib")
-        assert plot_alignments_overview([], [], tmp_path) is None
-        assert not (tmp_path / "plots").exists()
+        target = tmp_path / "x.alignments_overview.pdf"
+        assert plot_alignments_overview([], [], target) is None
+        assert not target.exists()
 
     def test_missing_matplotlib_raises(self, synthetic, tmp_path, monkeypatch):
         for name in [m for m in sys.modules if m == "matplotlib" or m.startswith("matplotlib.")]:
             monkeypatch.setitem(sys.modules, name, None)
         monkeypatch.setitem(sys.modules, "matplotlib", None)
         with pytest.raises(MissingPlotDependency):
-            plot_alignments_overview(*synthetic, tmp_path)
+            plot_alignments_overview(*synthetic, tmp_path / "x.pdf")
 
 
 class TestRendering:
@@ -168,12 +170,13 @@ def test_cli_plot_alignments(paf_file, fasta_file, tmp_path):
     pytest.importorskip("matplotlib")
     result = subprocess.run(
         [sys.executable, "-m", "rename_and_orient.cli", "--fasta", str(fasta_file),
-         "--paf", str(paf_file), "--output-dir", str(tmp_path), "-P", "--plot-format", "svg"],
+         "--paf", str(paf_file), "--output-dir", str(tmp_path), "-P"],
         capture_output=True, text=True,
     )
     assert result.returncode == 0, result.stderr
-    assert list((tmp_path / "plots").glob("*.svg"))
-    assert (tmp_path / "plots" / "alignments_overview.pdf").stat().st_size > 0
+    pdf = tmp_path / f"{fasta_file.stem}.alignments_overview.pdf"
+    assert pdf.stat().st_size > 0
+    assert not (tmp_path / "plots").exists()
 
 
 def test_cli_warns_without_matplotlib(paf_file, fasta_file, tmp_path):

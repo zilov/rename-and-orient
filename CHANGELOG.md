@@ -18,9 +18,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A gzipped input FASTA is decompressed once to a temporary file in `$TMPDIR` (removed when the run ends), because gzip does not support cheap random access. Plain FASTA files are read in place.
 
 ### Added
-- `--plot-alignments` now also writes `plots/alignments_overview.pdf`: a two-page PDF with a grid of every chromosome pair's alignment blocks, page 1 as aligned ("before"), page 2 after the orientation decision (target axis mirrored where RC is decided). Panels are ordered by reference chromosome and rasterized to keep the file small. The per-chromosome plots are still written.
+- `--plot-alignments` now writes a single `<output-prefix>.alignments_overview.pdf` next to the other outputs instead of per-chromosome images in `plots/`: a two-page PDF with a grid of every chromosome pair's alignment blocks, page 1 as aligned ("before"), page 2 after the orientation decision (target axis mirrored where RC is decided). Panels are ordered by reference chromosome and rasterized to keep the file small. `plotting.plot_chromosome_alignments` remains available as a library function.
 
-- `--plot-format {png,pdf,svg}` (default `png`) selects the image format for `--plot-alignments`.
 - New modules `fasta`, `paf`, `orientation`, `plotting`; `names` gained `natural_sort_key`, `report` gained `save_mapping_tsv`, `write_chromosome_list` and `print_mapping_summary`. The public API in `rename_and_orient.__init__` is unchanged.
 - `plotting.PlotData`, `prepare_plot_data`, `render_alignment_figure`, `save_figure` and `MissingPlotDependency` (an `ImportError`) for plotting with or without matplotlib.
 - `--verbose` (debug messages), `--quiet` (warnings and errors only; result tables are still printed) and `--log-file PATH` (all messages at debug level, with timestamps). No short flags: `-v` is `--version` and `-q` is `--query-chromosome-prefix`.

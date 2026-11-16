@@ -16,12 +16,7 @@ from .fasta import FastaIndex, calculate_genome_length, index_fasta, write_fasta
 from .mapping_table import load_mapping_table_assignments
 from .models import FinalChromosomeAssignment, UnlocMapping
 from .paf import filter_paf_records, parse_paf, validate_paf_fasta_consistency
-from .plotting import (
-    PLOT_FORMATS,
-    MissingPlotDependency,
-    plot_alignments_overview,
-    plot_chromosome_alignments,
-)
+from .plotting import MissingPlotDependency, plot_alignments_overview
 from .report import (
     format_assignment_table,
     format_mapping_summary,
@@ -173,14 +168,9 @@ def parse_args() -> argparse.Namespace:
         "--plot-alignments", "-P",
         action="store_true",
         default=False,
-        help="Generate scatter plots of PAF alignment blocks for each chromosome "
-             "(saved to <output-dir>/plots/). Requires matplotlib."
-    )
-    parser.add_argument(
-        "--plot-format",
-        choices=PLOT_FORMATS,
-        default="png",
-        help="Image format for --plot-alignments (default: png)"
+        help="Write <output-prefix>.alignments_overview.pdf to the output directory: "
+             "a grid of every chromosome's PAF alignment blocks, page 1 as aligned, "
+             "page 2 after the orientation decision. Requires matplotlib."
     )
 
     verbosity = parser.add_mutually_exclusive_group()
@@ -353,11 +343,11 @@ def _run_with_index(
     logger.info("Successfully mapped %d chromosomes", len(mappings))
 
     if args.plot_alignments:
-        logger.info("Generating alignment scatter plots...")
+        logger.info("Generating alignment overview PDF...")
         try:
-            plot_alignments_overview(filtered_records, mappings, args.output_dir)
-            plot_chromosome_alignments(
-                filtered_records, mappings, args.output_dir, args.plot_format
+            plot_alignments_overview(
+                filtered_records, mappings,
+                args.output_dir / f"{args.output_prefix}.alignments_overview.pdf",
             )
         except MissingPlotDependency as exc:
             logger.warning("%s", exc)

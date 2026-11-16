@@ -82,8 +82,7 @@ in the table (`SUPER_1_HAP1` stays `SUPER_1_HAP1`, its unlocs become
 | `--query-chromosome-prefix` | `-q` | `SUPER_` | Prefix for query scaffolds |
 | `--output-chromosome-prefix` | `-x` | `SUPER_` | Prefix for output chromosome names |
 | `--reference-chromosome-prefix` | `-r` | auto | Reference chromosome prefix in PAF |
-| `--plot-alignments` | `-P` | off | Generate alignment scatter plots (requires matplotlib) |
-| `--plot-format` | | png | Plot image format: `png`, `pdf` or `svg` |
+| `--plot-alignments` | `-P` | off | Write `<prefix>.alignments_overview.pdf`: before/after grids of all alignments (requires matplotlib) |
 | `--verbose` | | off | Show debug messages on stderr |
 | `--quiet` | | off | Show only warnings and errors on stderr (mutually exclusive with `--verbose`) |
 | `--log-file` | | none | Also write all messages (debug level, timestamped) to this file |
@@ -97,7 +96,7 @@ Progress messages and warnings are logged to stderr; the result tables (mapping 
 | `<prefix>.fa` | Renamed and oriented FASTA |
 | `<prefix>.chromosome.list.csv` | Chromosome list CSV (`name,suffix,yes/no`) |
 | `<prefix>.mapping.tsv` | Mapping summary TSV (PAF mode only) |
-| `plots/` | Alignment scatter plots and `alignments_overview.pdf` (before/after grids) (if `--plot-alignments`) |
+| `<prefix>.alignments_overview.pdf` | Two-page PDF: all alignments as aligned / after orientation (if `--plot-alignments`) |
 
 ## Development
 

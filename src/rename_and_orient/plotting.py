@@ -237,9 +237,6 @@ def plot_chromosome_alignments(
     return written
 
 
-OVERVIEW_FILENAME = "alignments_overview.pdf"
-
-
 def _natural_key(name: str) -> list[object]:
     """Sort key that orders embedded integers numerically (chr_2 before chr_10)."""
     return [int(t) if t.isdigit() else t for t in re.split(r"(\d+)", name)]
@@ -346,21 +343,21 @@ def save_overview_pdf(data_list: list[PlotData], path: Path, ncols: int = 6) -> 
 def plot_alignments_overview(
     records: list[PAFRecord],
     mappings: list[ChromosomeMapping],
-    output_dir: Path,
+    out_path: Path,
     ncols: int = 6,
 ) -> Path | None:
-    """Write ``<output_dir>/plots/alignments_overview.pdf`` (before / after grids).
+    """Write a two-page PDF with before/after grids of every chromosome pair.
 
     Panels are ordered by target (reference) chromosome name, naturally sorted.
 
     Args:
         records: Filtered PAF records.
         mappings: Chromosome mappings with orientation decisions.
-        output_dir: Directory under which the ``plots`` directory is created.
+        out_path: Output PDF path (parent directory is created if needed).
         ncols: Number of grid columns.
 
     Returns:
-        Path of the written PDF, or None if there is nothing to plot.
+        ``out_path``, or None if there is nothing to plot.
 
     Raises:
         MissingPlotDependency: If matplotlib is not installed.
@@ -374,9 +371,7 @@ def plot_alignments_overview(
         logger.warning("No alignments to plot; overview PDF not written")
         return None
 
-    plots_dir = output_dir / "plots"
-    plots_dir.mkdir(parents=True, exist_ok=True)
-    out_path = plots_dir / OVERVIEW_FILENAME
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     save_overview_pdf(data_list, out_path, ncols)
     logger.info("Alignment overview saved to: %s", out_path)
     return out_path
