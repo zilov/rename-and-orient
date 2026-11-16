@@ -1,6 +1,17 @@
-"""Chromosome assignment resolution and sorting."""
+"""Chromosome assignment resolution and sorting.
+
+Two similar-looking models are involved:
+
+* ``ChromosomeMapping`` (from :mod:`rename_and_orient.alignment`) is the raw
+  alignment result: which reference chromosome a query matches best, coverage,
+  strand lengths and the orientation decision.
+* ``FinalChromosomeAssignment`` (produced here) is the final naming decision:
+  the new name/suffix a chromosome gets in the output, resolved from the
+  mappings (conflicts, sex chromosomes, haplotype tags) and used for writing files.
+"""
+import logging
 from collections import defaultdict
-from typing import Dict, List, Tuple
+from collections.abc import Collection
 
 from .models import ChromosomeMapping, FinalChromosomeAssignment, UnlocMapping
 from .names import (
@@ -13,15 +24,16 @@ from .names import (
     strip_hap_suffix,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def resolve_chromosome_assignments(
-    mappings: List[ChromosomeMapping],
-    sequences: Dict[str, str],
+    mappings: list[ChromosomeMapping],
+    sequences: Collection[str],
     query_chromosome_prefix: str = "SUPER_",
     output_prefix: str = "SUPER_"
-) -> Tuple[List[FinalChromosomeAssignment], Dict[str, bool]]:
-    """
-    Resolve chromosome assignments with conflict handling and sex chromosome logic.
+) -> tuple[list[FinalChromosomeAssignment], dict[str, bool]]:
+    """Resolve chromosome assignments with conflict handling and sex chromosome logic.
 
     This function handles:
     1. Sex chromosome detection (W, Z, X, Y, Z1, Z2, etc.)
@@ -32,7 +44,7 @@ def resolve_chromosome_assignments(
 
     Args:
         mappings: List of ChromosomeMapping objects from PAF analysis
-        sequences: Dictionary of all sequences (for finding unmapped ones)
+        sequences: Names of all sequences (any collection, e.g. dict or FastaIndex)
         query_chromosome_prefix: Input chromosome prefix (e.g., "SUPER_", "scaffold_")
         output_prefix: Output chromosome prefix (e.g., "SUPER_", "chr_", "chr", "")
 
@@ -44,7 +56,7 @@ def resolve_chromosome_assignments(
     assignments = []
     rc_lookup = {}
 
-    all_chr_names = {name for name in sequences.keys()
+    all_chr_names = {name for name in sequences
                      if name.startswith(query_chromosome_prefix) and "_unloc_" not in name}
     mapped_names = {m.query_name for m in mappings if "_unloc_" not in m.query_name}
     unmapped_names = all_chr_names - mapped_names
@@ -69,7 +81,10 @@ def resolve_chromosome_assignments(
         suffix = extract_chromosome_suffix(name, query_chromosome_prefix)
         if is_autosome_suffix(suffix):
             reserved_numbers.add(int(strip_hap_suffix(suffix)))
-            print(f"  Reserved: number {strip_hap_suffix(suffix)} (unmapped {name} keeps original name)")
+            logger.info(
+                "Reserved: number %s (unmapped %s keeps original name)",
+                strip_hap_suffix(suffix), name,
+            )
 
     skipped_numbers = set()
 
@@ -79,8 +94,10 @@ def resolve_chromosome_assignments(
 
         if is_autosome_suffix(target_suffix):
             skipped_numbers.add(int(target_suffix))
-            print(f"  Note: {m.query_name} (sex chr) -> {m.target_name} (autosome): "
-                  f"number {target_suffix} will be skipped")
+            logger.warning(
+                "%s (sex chr) -> %s (autosome): number %s will be skipped",
+                m.query_name, m.target_name, target_suffix,
+            )
 
         assignment = FinalChromosomeAssignment(
             original_name=m.query_name,
@@ -100,8 +117,10 @@ def resolve_chromosome_assignments(
 
         if is_sex_chromosome_suffix(target_suffix):
             autosomes_to_sex_target.append(m)
-            print(f"  Note: {m.query_name} (autosome) -> {m.target_name} (sex chr): "
-                  f"will be reassigned")
+            logger.warning(
+                "%s (autosome) -> %s (sex chr): will be reassigned",
+                m.query_name, m.target_name,
+            )
         elif is_autosome_suffix(target_suffix):
             target_num = int(target_suffix)
             target_to_autosomes[target_num].append((m, m.total_alignment_length))
@@ -113,7 +132,8 @@ def resolve_chromosome_assignments(
     for target_num, candidates in target_to_autosomes.items():
         if target_num in reserved_numbers:
             deferred_autosomes.extend([m for m, _ in candidates])
-            print(f"  Number {target_num} reserved - deferring: {[m.query_name for m, _ in candidates]}")
+            deferred = [m.query_name for m, _ in candidates]
+            logger.debug("Number %s reserved - deferring: %s", target_num, deferred)
             continue
 
         if target_num in skipped_numbers:
@@ -128,7 +148,9 @@ def resolve_chromosome_assignments(
 
         for m, _ in candidates[1:]:
             deferred_autosomes.append(m)
-            print(f"  Conflict: {m.query_name} lost to {winner.query_name} for number {target_num}")
+            logger.info(
+                "Conflict: %s lost to %s for number %s", m.query_name, winner.query_name, target_num
+            )
 
     all_used_numbers = assigned_numbers | reserved_numbers
     max_autosome = max(all_used_numbers) if all_used_numbers else 0
@@ -142,7 +164,7 @@ def resolve_chromosome_assignments(
         autosome_assignments.append((m, next_available))
         assigned_numbers.add(next_available)
         unavailable.add(next_available)
-        print(f"  Reassigned: {m.query_name} -> {output_prefix}{next_available}")
+        logger.warning("Reassigned: %s -> %s%s", m.query_name, output_prefix, next_available)
         next_available += 1
 
     for m in autosomes_to_sex_target:
@@ -151,7 +173,9 @@ def resolve_chromosome_assignments(
         autosome_assignments.append((m, next_available))
         assigned_numbers.add(next_available)
         unavailable.add(next_available)
-        print(f"  Reassigned (was sex target): {m.query_name} -> {output_prefix}{next_available}")
+        logger.warning(
+            "Reassigned (was sex target): %s -> %s%s", m.query_name, output_prefix, next_available
+        )
         next_available += 1
 
     for m, num in autosome_assignments:
@@ -179,16 +203,15 @@ def resolve_chromosome_assignments(
         )
         assignments.append(assignment)
         rc_lookup[name] = False
-        print(f"  Unmapped: {name} -> {output_prefix}{suffix} (keeping orientation)")
+        logger.info("Unmapped: %s -> %s%s (keeping orientation)", name, output_prefix, suffix)
 
     return assignments, rc_lookup
 
 
 def sort_assignments_for_output(
-    assignments: List[FinalChromosomeAssignment]
-) -> List[FinalChromosomeAssignment]:
-    """
-    Sort assignments for output: autosomes by number, then sex chromosomes alphabetically.
+    assignments: list[FinalChromosomeAssignment]
+) -> list[FinalChromosomeAssignment]:
+    """Sort assignments for output: autosomes by number, then sex chromosomes alphabetically.
 
     Args:
         assignments: List of FinalChromosomeAssignment
@@ -206,17 +229,16 @@ def sort_assignments_for_output(
 
 
 def build_unloc_mappings(
-    sequences: Dict[str, str],
-    chromosome_mappings: List[ChromosomeMapping]
-) -> List[UnlocMapping]:
-    """
-    Build mappings for unlocalized contigs based on parent chromosome mappings.
+    sequences: Collection[str],
+    chromosome_mappings: list[ChromosomeMapping]
+) -> list[UnlocMapping]:
+    """Build mappings for unlocalized contigs based on parent chromosome mappings.
 
     Unloc contigs (SUPER_N_unloc_M) inherit orientation from their parent
     chromosome (SUPER_N). They don't need alignment-based mapping.
 
     Args:
-        sequences: Dictionary of all sequences (name -> sequence)
+        sequences: Names of all sequences (any collection, e.g. dict or FastaIndex)
         chromosome_mappings: List of chromosome mappings
 
     Returns:
@@ -226,7 +248,7 @@ def build_unloc_mappings(
 
     unloc_mappings = []
 
-    for seq_name in sequences.keys():
+    for seq_name in sequences:
         if not is_unloc_contig(seq_name):
             continue
 

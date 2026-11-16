@@ -1,30 +1,32 @@
 """Unit tests for individual functions in rename_and_orient.py."""
-import pytest
+import logging
 from pathlib import Path
+
+import pytest
+
 from rename_and_orient import (
-    read_fasta,
-    parse_paf,
-    filter_paf_records,
-    validate_paf_fasta_consistency,
-    build_chromosome_mappings,
-    reverse_complement,
-    extract_chromosome_suffix,
-    strip_hap_suffix,
-    is_hap_contig,
-    write_fasta,
-    write_chromosome_list,
-    build_unloc_mappings,
-    sort_assignments_for_output,
-    is_sex_chromosome_suffix,
-    is_autosome_suffix,
-    resolve_chromosome_assignments,
-    detect_reference_prefix,
-    merge_intervals,
-    calculate_target_alignments,
-    load_mapping_table_assignments,
-    PAFRecord,
     ChromosomeMapping,
     FinalChromosomeAssignment,
+    PAFRecord,
+    build_chromosome_mappings,
+    calculate_target_alignments,
+    detect_reference_prefix,
+    extract_chromosome_suffix,
+    filter_paf_records,
+    is_autosome_suffix,
+    is_hap_contig,
+    is_sex_chromosome_suffix,
+    load_mapping_table_assignments,
+    merge_intervals,
+    parse_paf,
+    read_fasta,
+    resolve_chromosome_assignments,
+    reverse_complement,
+    sort_assignments_for_output,
+    strip_hap_suffix,
+    validate_paf_fasta_consistency,
+    write_chromosome_list,
+    write_fasta,
 )
 
 
@@ -178,6 +180,44 @@ class TestReverseComplement:
         result = reverse_complement("")
         assert result == ""
 
+    def test_reverse_complement_mixed_case(self):
+        """Test reverse complement with mixed case."""
+        assert reverse_complement("AcGtNn") == "nNaCgT"
+
+    def test_reverse_complement_n_preserved(self):
+        """N and n complement to themselves."""
+        assert reverse_complement("NnN") == "NnN"
+
+    def test_reverse_complement_iupac(self):
+        """IUPAC ambiguity codes are complemented (R<->Y, K<->M, H<->D, B<->V)."""
+        assert reverse_complement("RYK") == "MRY"
+        assert reverse_complement("RYKMSWHBVD") == "HBVDWSKMRY"
+        assert reverse_complement("rykmswhbvd") == "hbvdwskmry"
+
+    def test_reverse_complement_iupac_is_involution(self):
+        """Applying reverse_complement twice returns the original sequence."""
+        seq = "ACGTRYMKSWHBVDNacgtrymkswhbvdn"
+        assert reverse_complement(reverse_complement(seq)) == seq
+
+    def test_reverse_complement_unknown_and_non_ascii_passthrough(self):
+        """Unknown and non-ASCII characters pass through unchanged."""
+        assert reverse_complement("A-*\u00e9\u4e2dT") == "A\u4e2d\u00e9*-T"
+
+    def test_reverse_complement_matches_reference_loop(self):
+        """On ACGTN input the result equals the original per-character implementation."""
+        import random
+
+        complement = {'A': 'T', 'T': 'A', 'G': 'C', 'C': 'G',
+                      'a': 't', 't': 'a', 'g': 'c', 'c': 'g',
+                      'N': 'N', 'n': 'n'}
+
+        def reference(seq):
+            return ''.join(complement.get(b, b) for b in reversed(seq))
+
+        rng = random.Random(42)
+        seq = ''.join(rng.choice("ACGTacgtNn") for _ in range(10_000))
+        assert reverse_complement(seq) == reference(seq)
+
 
 class TestChromosomeSuffixFunctions:
     """Test chromosome suffix related functions."""
@@ -187,7 +227,8 @@ class TestChromosomeSuffixFunctions:
         ("chr_W", "chr_", "W"),
         ("scaffold_10", "scaffold_", "10"),
         ("chrZ1", "chr", "Z1"),
-        # HAP suffix is preserved by extract_chromosome_suffix (stripping is for classification only)
+        # HAP suffix is preserved by extract_chromosome_suffix
+        # (stripping is for classification only)
         ("SUPER_1_HAP1", "SUPER_", "1_HAP1"),
         ("SUPER_W_HAP2", "SUPER_", "W_HAP2"),
     ])
@@ -424,7 +465,10 @@ class TestDetectReferencePrefix:
             for i in range(1, 11)  # 10 chromosomes: SUPER_1 .. SUPER_10
         ]
         unloc_records = [
-            PAFRecord(f"qu_{i}", 100, 0, 100, "+", f"SUPER_{i // 100 + 1}_unloc_{i % 100 + 1}", 100, 0, 100, 100, 100, 60)
+            PAFRecord(
+                f"qu_{i}", 100, 0, 100, "+", f"SUPER_{i // 100 + 1}_unloc_{i % 100 + 1}",
+                100, 0, 100, 100, 100, 60,
+            )
             for i in range(1000)  # 1000 unloc contigs
         ]
         result = detect_reference_prefix(chr_records + unloc_records)
@@ -591,7 +635,9 @@ class TestCalculateTargetAlignmentsNested:
 
         # chr_17: real unique 53 Mbp coverage
         chr17_records = [
-            self._make_record("SUPER_19", query_len, i * 1_000_000, (i + 1) * 1_000_000, "+", "chr_17")
+            self._make_record(
+                "SUPER_19", query_len, i * 1_000_000, (i + 1) * 1_000_000, "+", "chr_17"
+            )
             for i in range(53)
         ]
 
@@ -760,7 +806,10 @@ class TestUnlocOrderInOutput:
 class TestLoadMappingTable:
     """Tests for load_mapping_table_assignments (--mapping-table mode)."""
 
-    HEADER = "query\ttarget\trenamed_to\tquery_length\talignment_length\tcoverage\tplus_strand\tminus_strand\tneeds_reverse_complement\n"
+    HEADER = (
+        "query\ttarget\trenamed_to\tquery_length\talignment_length\tcoverage"
+        "\tplus_strand\tminus_strand\tneeds_reverse_complement\n"
+    )
 
     def _write_table(self, tmp_path, rows: list[str]) -> Path:
         p = tmp_path / "mapping.tsv"
@@ -824,7 +873,7 @@ class TestLoadMappingTable:
         )
         assert unloc_mappings[0].needs_reverse_complement is False
 
-    def test_chr_not_in_table_kept_with_warning(self, tmp_path, capsys):
+    def test_chr_not_in_table_kept_with_warning(self, tmp_path, caplog):
         """Chromosome missing from table keeps its original suffix, RC=False."""
         table = self._write_table(tmp_path, [
             "SUPER_1\tchr_1\tSUPER_1\t1000\t900\t0.9\t800\t100\tno\n",
@@ -834,7 +883,8 @@ class TestLoadMappingTable:
         by_orig = {a.original_name: a for a in assignments}
         assert by_orig["SUPER_99"].new_name == "SUPER_99"
         assert by_orig["SUPER_99"].needs_reverse_complement is False
-        assert "Warning" in capsys.readouterr().out
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert any("SUPER_99 not in mapping table" in r.getMessage() for r in warnings)
 
     def test_missing_column_raises(self, tmp_path):
         """ValueError raised when a required column is missing."""
@@ -949,6 +999,6 @@ class TestOrientationByCorrelation:
     def test_long_minus_blocks_beat_many_short_scattered_plus_hits(self, test_data_dir):
         """Regression (ilHysMacu3 SUPER_24): two long '-' blocks form a clean
         anti-diagonal; ~290 tiny scattered '+' repeat hits must not outvote them."""
-        from rename_and_orient.alignment import needs_reverse_complement_by_correlation
+        from rename_and_orient.orientation import needs_reverse_complement_by_correlation
         recs = parse_paf(test_data_dir / "super24_inversion.paf")
         assert needs_reverse_complement_by_correlation(recs, recs[0].target_length) is True
