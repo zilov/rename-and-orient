@@ -282,7 +282,10 @@ def _run(args: argparse.Namespace) -> None:
     inputs = [p for p in (args.fasta, args.paf, args.mapping_table) if p is not None]
     clash = [p for p in inputs if p.resolve() in outputs]
     if clash:
-        logger.error("Output path would overwrite input file %s; change --output-dir or --output-prefix", clash[0])
+        logger.error(
+            "Output path would overwrite input file %s; change --output-dir or --output-prefix",
+            clash[0],
+        )
         sys.exit(1)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)

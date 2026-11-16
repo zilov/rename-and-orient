@@ -1006,10 +1006,11 @@ class TestOrientationByCorrelation:
 
 def test_sort_assignments_non_numeric_suffix_after_numeric():
     """Regression: SUPER_1A / SUPER_MT used to crash with int('1A')."""
-    mk = lambda s: FinalChromosomeAssignment(
-        original_name=f"o{s}", new_name=f"SUPER_{s}", new_suffix=s,
-        needs_reverse_complement=False, is_sex_chromosome=(s == "X"),
-    )
+    def mk(s):
+        return FinalChromosomeAssignment(
+            original_name=f"o{s}", new_name=f"SUPER_{s}", new_suffix=s,
+            needs_reverse_complement=False, is_sex_chromosome=(s == "X"),
+        )
     out = sort_assignments_for_output([mk(s) for s in ["X", "MT", "10", "1A", "2", "1"]])
     assert [a.new_suffix for a in out] == ["1", "2", "10", "1A", "MT", "X"]
 
