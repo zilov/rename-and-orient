@@ -189,4 +189,3 @@ from .paf import (  # noqa: E402, F401
     filter_paf_records,
     validate_paf_fasta_consistency,
 )
-from .plotting import plot_chromosome_alignments  # noqa: E402, F401

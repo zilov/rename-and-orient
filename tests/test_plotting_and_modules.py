@@ -10,10 +10,7 @@ from rename_and_orient.plotting import (
     MissingPlotDependency,
     PlotData,
     plot_alignments_overview,
-    plot_chromosome_alignments,
     prepare_plot_data,
-    render_alignment_figure,
-    save_figure,
 )
 
 TARGET_LEN = 50_000_000
@@ -76,7 +73,6 @@ def test_alignment_reexports_moved_names():
     for name in (
         "needs_reverse_complement_by_correlation", "filter_paf_records",
         "detect_reference_prefix", "validate_paf_fasta_consistency",
-        "plot_chromosome_alignments",
     ):
         assert callable(getattr(alignment, name))
 
@@ -129,41 +125,6 @@ class TestOverviewPdf:
         monkeypatch.setitem(sys.modules, "matplotlib", None)
         with pytest.raises(MissingPlotDependency):
             plot_alignments_overview(*synthetic, tmp_path / "x.pdf")
-
-
-class TestRendering:
-    @pytest.mark.parametrize("ext", ["png", "svg", "pdf"])
-    def test_render_and_save(self, synthetic, tmp_path, ext):
-        pytest.importorskip("matplotlib")
-        fig = render_alignment_figure(prepare_plot_data(*synthetic)[0])
-        out = tmp_path / f"fig.{ext}"
-        save_figure(fig, out)
-        assert out.stat().st_size > 0
-
-    @pytest.mark.parametrize("fmt", ["png", "svg", "pdf"])
-    def test_wrapper_file_names(self, synthetic, tmp_path, fmt):
-        pytest.importorskip("matplotlib")
-        paths = plot_chromosome_alignments(*synthetic, tmp_path, fmt)
-        assert [p.name for p in paths] == [
-            f"SUPER_1_vs_chr_1.{fmt}", f"SUPER_2_vs_chr_2.{fmt}",
-        ]
-        assert all(p.parent == tmp_path / "plots" and p.exists() for p in paths)
-
-    def test_wrapper_rejects_unknown_format(self, synthetic, tmp_path):
-        with pytest.raises(ValueError, match="Unsupported plot format"):
-            plot_chromosome_alignments(*synthetic, tmp_path, "gif")
-
-
-def test_missing_matplotlib_raises_dedicated_error(synthetic, tmp_path, monkeypatch):
-    for name in [m for m in sys.modules if m == "matplotlib" or m.startswith("matplotlib.")]:
-        monkeypatch.setitem(sys.modules, name, None)
-    monkeypatch.setitem(sys.modules, "matplotlib", None)
-    assert issubclass(MissingPlotDependency, ImportError)
-    with pytest.raises(MissingPlotDependency):
-        render_alignment_figure(prepare_plot_data(*synthetic)[0])
-    with pytest.raises(MissingPlotDependency):
-        plot_chromosome_alignments(*synthetic, tmp_path)
-    assert not (tmp_path / "plots").exists()
 
 
 def test_cli_plot_alignments(paf_file, fasta_file, tmp_path):
