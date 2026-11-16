@@ -108,6 +108,22 @@ class TestParsePaf:
         assert result[0].strand == "+"
         assert result[0].target_name == "chr_1"
 
+    def test_parse_paf_bad_number_reports_line(self, tmp_path):
+        paf = tmp_path / "bad.paf"
+        good = "q\t10\t0\t10\t+\tt\t10\t0\t10\t10\t10\t60\n"
+        paf.write_text(good + good.replace("\t10\t0\t10\t+", "\tX\t0\t10\t+", 1))
+        with pytest.raises(ValueError, match=r"bad\.paf:2"):
+            parse_paf(paf)
+
+    def test_parse_paf_warns_about_short_lines(self, tmp_path, caplog):
+        paf = tmp_path / "short.paf"
+        good = "q\t10\t0\t10\t+\tt\t10\t0\t10\t10\t10\t60\n"
+        paf.write_text(good + "a\tb\n" + "c\n")
+        with caplog.at_level(logging.WARNING, logger="rename_and_orient"):
+            assert len(parse_paf(paf)) == 1
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) == 1 and "2 PAF line" in warnings[0].getMessage()
+
 
 class TestFilterPafRecords:
     """Test filter_paf_records function."""

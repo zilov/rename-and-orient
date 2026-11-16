@@ -27,7 +27,9 @@ def parse_paf(paf_path: Path) -> list[PAFRecord]:
     11. Alignment block length
     12. Mapping quality (0-255)
 
-    Lines with fewer than 12 tab-separated fields are skipped silently.
+    Lines with fewer than 12 tab-separated fields are skipped (one warning
+    reports how many). A non-numeric numeric field raises ValueError with the
+    file name and line number.
 
     Args:
         paf_path: Path to PAF file
@@ -36,33 +38,40 @@ def parse_paf(paf_path: Path) -> list[PAFRecord]:
         List of PAFRecord objects
     """
     records = []
+    skipped = 0
 
     with open(paf_path) as f:
-        for line in f:
+        for lineno, line in enumerate(f, 1):
             line = line.strip()
             if not line:
                 continue
 
             fields = line.split('\t')
             if len(fields) < 12:
+                skipped += 1
                 continue
 
-            record = PAFRecord(
-                query_name=fields[0],
-                query_length=int(fields[1]),
-                query_start=int(fields[2]),
-                query_end=int(fields[3]),
-                strand=fields[4],
-                target_name=fields[5],
-                target_length=int(fields[6]),
-                target_start=int(fields[7]),
-                target_end=int(fields[8]),
-                num_matches=int(fields[9]),
-                alignment_length=int(fields[10]),
-                mapping_quality=int(fields[11])
-            )
+            try:
+                record = PAFRecord(
+                    query_name=fields[0],
+                    query_length=int(fields[1]),
+                    query_start=int(fields[2]),
+                    query_end=int(fields[3]),
+                    strand=fields[4],
+                    target_name=fields[5],
+                    target_length=int(fields[6]),
+                    target_start=int(fields[7]),
+                    target_end=int(fields[8]),
+                    num_matches=int(fields[9]),
+                    alignment_length=int(fields[10]),
+                    mapping_quality=int(fields[11])
+                )
+            except ValueError as e:
+                raise ValueError(f"{paf_path}:{lineno}: malformed PAF line ({e})") from e
             records.append(record)
 
+    if skipped:
+        logger.warning("%s: skipped %d PAF line(s) with fewer than 12 columns", paf_path, skipped)
     return records
 
 

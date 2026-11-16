@@ -38,6 +38,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Alignment plots use the real target length (`target_length` from the PAF) to mirror the right-hand panel, instead of `max(target_end)`.
 - The run is refused (exit code 1) when `<output-dir>/<output-prefix>.fa` or `.chromosome.list.csv` would overwrite `--fasta`, `--paf` or `--mapping-table`; previously the input FASTA was truncated.
+- A malformed PAF line (non-numeric field) now raises a `ValueError` naming the file and line number, and PAF lines with fewer than 12 columns are no longer dropped silently: one warning reports how many were skipped.
 - Chromosome names with a non-numeric suffix (`SUPER_1A`, `SUPER_MT`) no longer crash output sorting or `--mapping-table`; they sort after the numeric chromosomes.
 
 ## [1.2.4] - 2026-10-26
